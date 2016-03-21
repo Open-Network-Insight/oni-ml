@@ -4,6 +4,8 @@ import org.apache.spark.storage.StorageLevel
 import org.apache.spark.mllib.linalg.Vectors
 import breeze.stats.DescriptiveStats._
 import breeze.linalg._
+import scala.io.Source
+import scala.math._
 import org.apache.log4j.Logger
 import org.apache.log4j.Level
 
@@ -27,8 +29,7 @@ def removeHeader(input: org.apache.spark.rdd.RDD[String]) = {
 def get_column_names(input: org.apache.spark.rdd.RDD[String], sep : Char = ',') : scala.collection.mutable.Map[String, Int] = {
     val columns = scala.collection.mutable.Map[String, Int]()
     val header = input.first.split(sep).zipWithIndex
-    columns("day") = 0
-    header.foreach(tuple => columns(tuple._1) = tuple._2+1)
+    header.foreach(tuple => columns(tuple._1) = tuple._2)
     columns
 }
 
@@ -37,19 +38,10 @@ def print_columns(columns : scala.collection.mutable.Map[String, Int]) = {
     arr.sortBy(_._2).foreach(println)
 }
 
-/**
-def bin_column(row: Array[String], column: String, cuts: Array[Double]) = {
-    var bin = 0
-    for (cut <- cuts){
-        if (row(col(column)).toDouble > cut) { bin = bin+1 }
-    }
-    col(column + "_bin") = row.length + 1   //update the column index automatically
-    row :+ bin.toString
-}
-
 
 def print(input: org.apache.spark.rdd.RDD[String]) = input.take(10).foreach(println)
 
+def print_rdd(input: org.apache.spark.rdd.RDD[Array[String]]) = input.take(20).foreach(m => println(m.mkString(",") ))
 
 // Load and parse the data
 
@@ -63,101 +55,146 @@ class SimpleCSVHeader(header:Array[String]) extends Serializable {
 
 
 //----------Inputs-------------
-val file = System.getenv("DPATH")
-val topic_mix_file = System.getenv("HPATH") + "/doc_results.csv"
-val pword_file = System.getenv("HPATH")+"/word_results.csv"
+//val file = System.getenv("DPATH")
+val file_list = System.getenv("DPATH")
+val topic_mix_file =System.getenv("HPATH")  + "/doc_results.csv"
+val pword_file = System.getenv("HPATH") + "/word_results.csv"
 val scored_output_file = System.getenv("HPATH") + "/scored"
-val threshold : Double = system.getenv("TOL").toDouble
+val threshold : Double = System.getenv("TOL").toDouble
 
 
-//val outputfile = "/user/history/hiveflow/netflow/dns_test_word_count.csv"
-val quant = Array(0, 0.1,0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9)
-val domain_freq_cuts = Array(0.0, 0.0016221675888432989, 0.003437437437664978, 0.003504835695562082, 0.0050467239654149575, 0.013090365707594635, 0.016089127244084477, 0.10621307500188512, 0.1597068462448228)
-val frame_length_cuts = Array(0.0, 97.0, 134.0, 137.0, 170.0)
-val subdoman_length_cuts = Array(0.0, 4.0, 10.0, 15.0)
-val entropy_cuts = Array(0.0, 2.0, 3.240223928941852, 3.3735572622751855, 3.506890595608519)
+val quant = Array(0, 0.2, 0.4, 0.6, 0.8)
+var frame_length_cuts = new Array[Double](5)
+var subdomain_length_cuts = new Array[Double](5)
+var numperiods_cuts = new Array[Double](5)
+var entropy_cuts = new Array[Double](5)
+val compute_quantiles = true
+
+val l_top_domains = Source.fromFile("top-1m.csv").getLines.map(line => {
+                      val parts = line.split(",")
+                     val l = parts.length
+                    parts(1).split("[.]")(0)
+                    }).toSet
+val top_domains = sc.broadcast(l_top_domains)
+
+val topics_lines = sc.textFile(topic_mix_file)
+//print(topics_lines)
+val words_lines = sc.textFile(pword_file)
+//print(words_lines)
+
+
+val l_topics = topics_lines.map(line => {
+    val ip = line.split(",")(0)
+    val text = line.split(",")(1)
+    val text_no_quote = text.replaceAll("\"", "").split(" ").map(v => v.toDouble)
+    (ip,text_no_quote)
+    }).map(elem => elem._1 -> elem._2).collectAsMap()
+
+val topics = sc.broadcast(l_topics)
+
+val l_words = words_lines.map(line => {
+    val word = line.split(",")(0)
+    val text = line.split(",")(1)
+    val text_no_quote = text.replaceAll("\"", "").split(" ").map(v => v.toDouble)
+    (word, text_no_quote)
+    }).map(elem => elem._1 -> elem._2).collectAsMap()
+
+val words = sc.broadcast(l_words)
+
 //-----------------------------
 
-val rawdata = sc.textFile(file)
+var multidata = {
+    var tempRDD: org.apache.spark.rdd.RDD[String] = sc.textFile( file_list.split(",")(0) )
+    val files = file_list.split(",")
+    for ( (file, index) <- files.zipWithIndex){
+        if (index > 1) {tempRDD = tempRDD.union(sc.textFile(file))}
+    }
+    tempRDD
+}
+var rawdata :org.apache.spark.rdd.RDD[String] = {
+     multidata
+}
+
+// only needed if the schema is different than the standard solution setup
+//val indices: Array[Int] = Array(0,1,2,8,9,10,11,12,13,14)
+//rawdata = rawdata.map(line => line.split(",")).map(inner => indices.map(inner).mkString(","))
+rawdata.take(10).foreach(println)
+
 val col = get_column_names(rawdata)
 
-//frame.time,frame.len,ip.src,ip.dst,dns.resp.name,dns.resp.type,dns.resp.class,dns.flags,dns.flags.rcode,dns.a
-//Aug  7, 2015 18:33:41.125691000 PDT,97,192.168.1.159,10.0.1.186,dbserver-a301a8c0.int,1,1,33152,0,192.168.1.163
-//Aug  7, 2015 18:33:41.135748000 PDT,97,192.168.1.107,10.0.1.200,dbserver-9b01a8c0.int,1,1,33152,0,192.168.1.155
-/**
-(day,0)
-(frame.time,1)
-(frame.len,2)
-(ip.src,3)
-(ip.dst,4)
-(dns.resp.name,5)
-(dns.resp.type,6)
-(dns.resp.class,7)
-(dns.flags,8)
-(dns.flags.rcode,9)
-(dns.a,10)
-(domain,11)
-(subdomain,12)
-(subdomain.length,13)
-(domain.freq,14)
-(subdomain.entropy,15)
-(domain_bin,16)
-(frame_length_bin,17)
-(subdomain_bin,18)
-(word,19)
-*/
+//frame.time_epoch  frame.len  ip.src  ip.dst  dns.qry.name  dns.qry.type  dns.qry.class  dns.flags.rcode  dns.a 
+
+def addcol(colname: String) = if (!col.keySet.exists(_==colname) ){col(colname) = col.values.max+1}
+
+
 
 val datanoheader = removeHeader(rawdata)
-val datagood = datanoheader.map(line => line.split(",") ).filter(line => (line.length == 11 | line.length == 10)).map(line => {
-    if (line.length == 10){ line :+ "None"
-    }else {line}
-    })
-val databad = datanoheader.filter(line => (line.split(",").length != 11 & line.split(",").length != 10))
-//databad.count
-//datagood.take(10).foreach(println)
-//datagood.count
-//res107: Long = 675953
+//print_rdd(datagood)
+val datagood = datanoheader.map(line => line.split(",") ).filter(line => (line.length == 9))
+
+//val databad = datanoheader.filter(line => (line.split(",").length != 24 & line.split(",").length != 23))
+
+print_rdd(datagood)
+println(datagood.count())
+
+val l_country_codes = Set("ac", "ad", "ae", "af", "ag", "ai", "al", "am", "an", "ao", "aq", "ar", "as", "at", "au", "aw", "ax", "az", "ba", "bb", "bd", "be", "bf", "bg", "bh", "bi", "bj", "bm", "bn", "bo", "bq", "br", "bs", "bt", "bv", "bw", "by", "bz", "ca", "cc", "cd", "cf", "cg", "ch", "ci", "ck", "cl", "cm", "cn", "co", "cr", "cu", "cv", "cw", "cx", "cy", "cz", "de", "dj", "dk", "dm", "do", "dz", "ec", "ee", "eg", "eh", "er", "es", "et", "eu", "fi", "fj", "fk", "fm", "fo", "fr", "ga", "gb", "gd", "ge", "gf", "gg", "gh", "gi", "gl", "gm", "gn", "gp", "gq", "gr", "gs", "gt", "gu", "gw", "gy", "hk", "hm", "hn", "hr", "ht", "hu", "id", "ie", "il", "im", "in", "io", "iq", "ir", "is", "it", "je", "jm", "jo", "jp", "ke", "kg", "kh", "ki", "km", "kn", "kp", "kr", "krd", "kw", "ky", "kz", "la", "lb", "lc", "li", "lk", "lr", "ls", "lt", "lu", "lv", "ly", "ma", "mc", "md", "me", "mg", "mh", "mk", "ml", "mm", "mn", "mo", "mp", "mq", "mr", "ms", "mt", "mu", "mv", "mw", "mx", "my", "mz", "na", "nc", "ne", "nf", "ng", "ni", "nl", "no", "np", "nr", "nu", "nz", "om", "pa", "pe", "pf", "pg", "ph", "pk", "pl", "pm", "pn", "pr", "ps", "pt", "pw", "py", "qa", "re", "ro", "rs", "ru", "rw", "sa", "sb", "sc", "sd", "se", "sg", "sh", "si", "sj", "", "sk", "sl", "sm", "sn", "so", "sr", "ss", "st", "su", "sv", "sx", "sy", "sz", "tc", "td", "tf", "tg", "th", "tj", "tk", "tl", "tm", "tn", "to", "tp", "tr", "tt", "tv", "tw", "tz", "ua", "ug", "uk", "us", "uy", "uz", "va", "vc", "ve", "vg", "vi", "vn", "vu", "wf", "ws", "ye", "yt", "za", "zm", "zw")
+
+val country_codes = sc.broadcast(l_country_codes)
 
 
 def extract_subdomain(url: String): Array[String ]= {
-    var spliturl = url.split("\\.")
+
+
+
+       
+    var spliturl = url.split("[.]")
     var numparts = spliturl.length
     var domain = "None"
     var subdomain = "None"
-    if (spliturl(0) == "http://" | spliturl(0) == "https://" ){
-        spliturl = spliturl.slice(1,numparts)
-        numparts = numparts - 1
+    //var country ="None"
+    //var tld = "None"
+    var host = {if (numparts>0){spliturl(0)} else "None" }
+    
+    //first check if query is an Ip address e.g.: 123.103.104.10.in-addr.arpa or a name
+    val is_ip ={ if (numparts>2){if (spliturl(numparts-1) == "arpa" & spliturl(numparts-2) == "in-addr"){"IP"} else "Name"} else "Unknown" }
+    
+    if (numparts>2 & is_ip !="IP"){
+        //This might try to parse things with only 1 or 2 numparts
+        //test if last element is a country code or tld
+        //use: Array(spliturl(numparts-1)).exists(country_codes contains _)
+        // don't use: country_codes.exists(spliturl(numparts-1).contains) this doesn't test exact match, might just match substring
+        if (Array(spliturl(numparts-1)).exists(country_codes.value contains _)){
+            //country = spliturl(numparts-1)
+            //tld = {if(Array(spliturl(numparts-2)).exists(tlds.value contains _)){spliturl(numparts-2)} else "None" }
+            domain = spliturl(numparts-3)
+            if (1<numparts-3){ subdomain = spliturl.slice(1,numparts-3).mkString(".") } 
+        }
+        else{
+            //tld = {if(Array(spliturl(numparts-1)).exists(tlds contains _)){spliturl(numparts-1)} else "None" }
+            domain = spliturl(numparts-2)
+            if (1<numparts-2){ subdomain = spliturl.slice(1,numparts-2).mkString(".") }
+        }
     }
-    if (numparts < 4 & numparts > 1){
-        domain = spliturl(1)
-        subdomain = spliturl(0)
-    }else if (numparts> 3){ 
-        domain = spliturl(numparts-3)
-        subdomain = spliturl.slice(0,numparts-3).mkString(".")
-    }else if (numparts>0){ 
-        domain = {if (spliturl(0)==""){"None"} else spliturl(0)}
-        subdomain = "None"
-    }else {domain = {if (spliturl(0)==""){"None"} else spliturl(0)}
-        subdomain = "None"
-    }
-    Array(domain, subdomain, { if (subdomain !="None"){subdomain.length.toString} else {"0"}} )
+    //Array(domain, subdomain, host, country, tld, numparts.toString, { if (subdomain !="None"){subdomain.length.toString} else {"0"}}, url.length.toString, is_ip )
+    Array( domain,subdomain, { if (subdomain !="None"){subdomain.length.toString} else {"0"}}, numparts.toString)
 }
+println("Computing subdomain info")
+
+var data_with_subdomains = datagood.map(row => row ++ extract_subdomain(row(col("dns.qry.name")) ) )
+addcol("domain")
+addcol("subdomain")
+addcol("subdomain.length")
+addcol("num.periods")
+
+print_rdd(data_with_subdomains)
+println(data_with_subdomains.count())
 
 
-val data_with_subdomains = datagood.map(row => row ++ extract_subdomain(row(col("dns.resp.name")) ) )
-col("domain") = col.values.max+1
-col("subdomain") = col.values.max+1
-col("subdomain.length") = col.values.max+1
-
-//data_with_subdomains.take(200).map(line => line.mkString(",")).foreach(println)
-
-val domain_table = data_with_subdomains.map(row =>(row(col("domain")), 1)).reduceByKey(_+_)
-val num_domains = domain_table.map(row => row._2.toDouble).sum()
-val domain_table_pct = domain_table.map(row => (row._1, row._2.toDouble/num_domains.toDouble) )
-//domain_table_pct.take(num_domains.asInstanceOf[Int]).map(m => m.toString.replaceAll("\\)","").replaceAll("\\(","") ).foreach(println)
-
-val data_with_domain_freq = data_with_subdomains.map(data => (data(col("domain")), data) ).join(domain_table_pct).map( newdata => newdata._2._1 :+ newdata._2._2.toString)
-col("domain.freq") = col.values.max+1
+def bin_column(value: String, cuts: Array[Double]) = {
+    var bin = 0
+    for (cut <- cuts){ if (value.toDouble > cut) { bin = bin+1 } }
+    bin.toString
+}
  
 def entropy( v:String ) : Double = { v
   .groupBy (a => a)
@@ -167,177 +204,116 @@ def entropy( v:String ) : Double = { v
   .sum
 }
 
-val data_with_subdomain_entropy = data_with_domain_freq.map(data => data :+ entropy(data(col("subdomain"))).toString )
-col("subdomain.entropy") = col.values.max+1
-
-//val domain_freq_cuts = quantiles(quant, compute_ecdf(domain_table_pct.map(r => r._2)))
-//val frame_length_cuts = quantiles(quant, compute_ecdf(data_with_subdomains.map(r => r(col("frame.len")).toDouble )))
-//val subdoman_length_cuts = quantiles(quant, compute_ecdf(data_with_subdomains.filter(r => r(col("subdomain.length")).toDouble > 0 ).map(r => r(13).toDouble )))
-//val entropy_cuts = quantiles(quant, compute_ecdf(data_with_subdomain_entropy.filter(r => r(col("subdomain.entropy")).toDouble > 0 ).map(r => r(15).toDouble )))
-
-
-def bin_d_f_s(row: Array[String], 
-                       domain_freq_cuts: Array[Double], 
-                       frame_length_cuts: Array[Double],
-                       subdomain_length_cuts: Array[Double]) = {
-    val domain_pct = row( col("domain.freq") ).toDouble
-    val subdomain_length = row( col("subdomain.length") ).toDouble
-    val frame_length = row( col("frame.len") ).toDouble
-    var domain_bin = 0
-    var subdomain_bin = 0
-    var frame_length_bin = 0
-    for (cut <- domain_freq_cuts){
-        if (domain_pct > cut) { domain_bin = domain_bin+1 }
-    }
-    for (cut <- frame_length_cuts){
-        if (frame_length > cut) { frame_length_bin = frame_length_bin+1 }
-    }
-    for (cut <- subdomain_length_cuts){
-        if (subdomain_length > cut) { subdomain_bin = subdomain_bin+1 }
-    }
-    row :+ domain_bin.toString :+ frame_length_bin.toString :+ subdomain_bin.toString
-}
-
-//s1 = bin_ibyt_ipkt_time(row = s1, ibyt_cuts, ipkt_cuts, time_cuts)
-val binned_data = data_with_subdomain_entropy.map(row => bin_d_f_s(row, 
-                                                            domain_freq_cuts, 
-                                                            frame_length_cuts, 
-                                                            subdoman_length_cuts))
-col("domain_bin") = col.values.max+1
-col("frame_length_bin") = col.values.max+1
-col("subdomain_bin") = col.values.max+1
-
-
-
-val data_with_words = binned_data.map(row => row :+ row(col("ip.dst")) + "_" + row(col("domain_bin")) + "_" +row(col("frame_length_bin")) + "_" +row(col("subdomain_bin")) )
-col("word") = col.values.max+1
-
-
-val source = data_with_words.map(row => (row(col("ip.dst")), row) )
-
-
-val topics_lines = sc.textFile(topic_mix_file)
-//print(topics_lines)
-val words_lines = sc.textFile(pword_file)
-//print(words_lines)
-
-
-val topics = topics_lines.map(line => {
-    val ip = line.split(",")(0)
-    val text = line.split(",")(1)
-    val text_no_quote = text.replaceAll("\"", "")
-    (ip, text_no_quote.split(" "))
-    })
-
-
-//topics.take(10)
-
-//this is an inner join, so we only get the ip's that were sources
-val src_top = source.join(topics)
-//src_top.take(10)
-
-val src_top_w = src_top.map( row => {
-    val data = row._2._1
-    val topic_mix = row._2._2
-    (data(33), (data, topic_mix))
-    })
-
-val words = words_lines.map(line => {
-    val word = line.split(",")(0)
-    val text = line.split(",")(1)
-    val text_no_quote = text.replaceAll("\"", "")
-    (word, text_no_quote.split(" "))
-    })
-
-/**
-val words = words_lines.map(line => {
-    val word = line.split("\"")(1).replaceAll(",", "_")
-    val letters = word.split("_")
-    val word_adj = {
-        var f : Array[String] = Array() 
-        for (letter <- letters){
-            if (letter != "-1"){f = f :+ letter + ".0"}
+def compute_ecdf(x : org.apache.spark.rdd.RDD[Double]) : org.apache.spark.rdd.RDD[(Double, Double)] ={
+    val counts = x.map( v => (v,1)).reduceByKey(_+_).sortByKey().cache()
+    // compute the partition sums
+    val partSums: Array[Double] = 0.0 +: counts.mapPartitionsWithIndex {
+      case (index, partition) => Iterator(partition.map { case (sample, count) => count }.sum.toDouble)
+    }.collect()
+    
+    // get sample size
+    val numValues = partSums.sum
+    
+    // compute empirical cumulative distribution
+    val sumsRdd = counts.mapPartitionsWithIndex {
+      case (index, partition) => {
+        var startValue = 0.0
+        for (i <- 0 to index) {
+          startValue += partSums(i)
         }
-        f.mkString("_")
+        partition.scanLeft((0.0, startValue))((prev, curr) => (curr._1, prev._2 + curr._2)).drop(1)
+      }
     }
-    val text = line.split("\"")(3)
-    (word_adj, text.split(" "))
-    })
-*/
-
-val src_top_word = src_top_w.join(words)
-
-
-
-def wtonum(n: String) = {
-    val splits = n.split("e")
-    if (splits.length < 2 & splits(0).contains("e") ) { "0"
-    }else if (splits.length < 2 & splits(0).toDouble < 1){splits(0)
-    }else if (splits.length < 2){"0"
-    }else if (splits.length == 2 & (splits(1) == "0" | splits(1) == "-" | splits(1) == "-0") ){"0"
-    }else splits(0)+"e"+splits(1)
+    sumsRdd.map( elem => (elem._1, elem._2 / numValues))
 }
 
+def distributed_quantiles(quantiles: Array[Double], ecdf: org.apache.spark.rdd.RDD[(Double, Double)]): Array[Double] ={
+    def dqSeqOp(acc: Array[Double], value: (Double, Double) ) : Array[Double]= { 
+        var newacc: Array[Double] = acc
+        for ( (quant, pos) <- quantiles.zipWithIndex) {
+            newacc(pos) = if (value._2 < quant ) {max(newacc(pos), value._1)}else{newacc(pos)}
+        }
+        acc
+    }
+    
+    def dqCombOp(acc1: Array[Double], acc2: Array[Double]) = { (acc1 zip acc2).map(tuple => max(tuple._1, tuple._2)) }
+    
+    ecdf.aggregate(Array.fill[Double](quantiles.length)(0)) ((acc, value) =>dqSeqOp(acc, value), (acc1, acc2)=>dqCombOp(acc1, acc2))
+}
 
-val src_scored = src_top_word.map(row => {
-    val data = row._2._1._1
-    val topic_mix_orig = row._2._1._2
-    val topic_mix = topic_mix_orig.map(n => wtonum(n) )
-    val wordprob_orig = row._2._2
-    val wordprob = wordprob_orig.map(n => wtonum(n) )
-    val src_score = (topic_mix zip wordprob).map(elem => elem._1.toDouble*elem._2.toDouble).reduce(_+_)
-    (src_score, data :+ src_score.toString)
-    })
+data_with_subdomains = data_with_subdomains.map(data => data :+ entropy(data(col("subdomain"))).toString )
+addcol("subdomain.entropy")
 
-//src_scored.take(10)
+//frame.time_epoch  frame.len  ip.src  ip.dst  dns.qry.name  dns.qry.type  dns.qry.class  dns.flags.rcode  dns.a 
 
-val scored = src_scored.filter(elem => elem._1 < threshold).repartition(1).sortByKey().map( row => row._2.mkString(",") )
+
+if (compute_quantiles == true){
+    println("calculating frame length cuts ...")
+    frame_length_cuts = distributed_quantiles(quant, compute_ecdf(data_with_subdomains.map(r => r(col("frame.len")).toDouble )))
+    println(frame_length_cuts.mkString(",") )
+    println("calculating subdomain length cuts ...")
+    subdomain_length_cuts = distributed_quantiles(quant, compute_ecdf(data_with_subdomains.filter(r => r(col("subdomain.length")).toDouble > 0 ).map(r => r(col("subdomain.length")).toDouble )))
+    println(subdomain_length_cuts.mkString(",") )
+    println("calculating entropy cuts")
+    entropy_cuts = distributed_quantiles(quant, compute_ecdf(data_with_subdomains.filter(r => r(col("subdomain.entropy")).toDouble > 0 ).map(r => r(col("subdomain.entropy")).toDouble )))
+    println(entropy_cuts.mkString(",") )
+    println("calculating num periods cuts ...")
+    numperiods_cuts = distributed_quantiles(quant, compute_ecdf(data_with_subdomains.filter(r => r(col("num.periods")).toDouble > 0 ).map(r => r(col("num.periods")).toDouble )))
+    println(numperiods_cuts.mkString(",") )
+}
+println("count after cuts")
+println(data_with_subdomains.count())
+
+                        
+//println("loading top domains")
+//println(top_domains.count())
+top_domains.value.take(10).foreach(println)
+
+var data = data_with_subdomains.map(line => line :+ {if(line(col("domain")) == "intel"){"2"} else if(top_domains.value contains line(col("domain")) ) {"1"} else "0"})
+addcol("top_domain")
+print_rdd(data)
+//frame.time_epoch  frame.len  ip.src  ip.dst  dns.qry.name  dns.qry.type  dns.qry.class  dns.flags.rcode  dns.a 
+
+println("adding words")
+data = data.map(row => {
+        val word = row(col("top_domain")) + "_" + bin_column(row(col("frame.len")), frame_length_cuts) + "_" + 
+        	bin_column(row(col("subdomain.length")), subdomain_length_cuts) + "_" +
+                bin_column(row(col("subdomain.entropy")), entropy_cuts) + "_" +  
+		bin_column(row(col("num.periods")), numperiods_cuts) + "_" + row(col("dns.qry.type"))+ "_" +row(col("dns.flags.rcode"))
+row :+ word} )
+addcol("word")
+
+print_rdd(data)
+
+//val source = data.map(row => (row(col("ip.dst)), row) )
+
+
+print_columns(col)
+//src_top_w.take(10)
+
+//val src_top_word = src_top_w.join(words.value)
+//src_top_word.take(10)
+
+println("Computing conditional probability")
+
+val src_scored = data.map(row => {
+	val topic_mix = topics.value.getOrElse(row(col("id.orig_h")),Array(0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1) ).asInstanceOf[Array[Double]]
+	val word_prob = words.value.getOrElse(row(col("word")),Array(0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1) ).asInstanceOf[Array[Double]]
+        var src_score = 0.0 
+	for ( i <- 0 to 19) {
+         src_score += topic_mix(i) * word_prob(i)
+      	}
+	//val src_score = topic_mix :* wordprob
+	(src_score, row :+ src_score)
+	})
+addcol("score")
+
+src_scored.take(10)
+
+var scored = src_scored.filter(elem => elem._1 < threshold).sortByKey().map( row => row._2.mkString(",") )
+//var scored = src_scored.top(elem => elem._1 < threshold).sortByKey().map( row => row._2.mkString(",") )
+
+println(scored.count() )
 scored.persist(StorageLevel.MEMORY_AND_DISK)
 scored.saveAsTextFile(scored_output_file)
-
-
-
-
-
-
-
-
-
-
-
-//words.take(10)
-
-//val topicsBroadcast = sc.broadcast(topics.collectAsMap())
-
-//val rdd1 = sc.parallelize(Seq((1, "A"), (2, "B"), (3, "C")))
-//val rdd2 = sc.parallelize(Seq(((1, "Z"), 111), ((1, "ZZ"), 111), ((2, "Y"), 222), ((3, "X"), 333)))
-/**
-val rdd1Broadcast = sc.broadcast(rdd1.collectAsMap())
-val joined = rdd2.mapPartitions({ iter =>
-  val m = rdd1Broadcast.value
-  for {
-    ((t, w), u) <- iter
-    if m.contains(t)
-  } yield ((t, w), (u, m.get(t).get))
-}, preservesPartitioning = true)
-*/
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
