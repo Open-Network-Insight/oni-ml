@@ -14,7 +14,7 @@ DFOLDER='hive'
 
 #  pre-processing scala
 
-source /etc/duxbay.conf
+source /etc/oni.conf
 export DPATH
 export HPATH
 export LUSER
@@ -89,7 +89,7 @@ cat part-* > ${DSOURCE}_results.csv
 rm -f part-*
 
 #op ml stage         Ingest results_all_20150618.csv into suspicious connects front end
-source /etc/duxbay.conf
+source /etc/oni.conf
 
  #scp to UI node
  scp -r ${LPATH} ${UINODE}:${RPATH}
