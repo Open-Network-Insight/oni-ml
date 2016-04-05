@@ -51,25 +51,69 @@ val topic_mix_file = System.getenv("HPATH") + "/doc_results.csv"
 val pword_file = System.getenv("HPATH")+"/word_results.csv"
 val scored_output_file = System.getenv("HPATH") + "/scored"
 val threshold : Double = System.getenv("TOL").toDouble
+val compute_quantiles : Boolean = true
+val quant = Array(0.1,0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9)
+val quint = Array(0, 0.2, 0.4, 0.6, 0.8)
+var ibyt_cuts = new Array[Double](10)
+var ipkt_cuts = new Array[Double](5)
+var time_cuts = new Array[Double](10)
 
-
-val cuts_input = System.getenv("CUT")
-var ibyt_cuts : Array[Double] = cuts_input.split(",")(0).split(" ").map(_.toDouble)
-var ipkt_cuts : Array[Double] = cuts_input.split(",")(1).split(" ").map(_.toDouble)
-var time_cuts : Array[Double] = cuts_input.split(",")(2).split(" ").map(_.toDouble)
+//val cuts_input = System.getenv("CUT")
+//var ibyt_cuts : Array[Double] = cuts_input.split(",")(0).split(" ").map(_.toDouble)
+//var ipkt_cuts : Array[Double] = cuts_input.split(",")(1).split(" ").map(_.toDouble)
+//var time_cuts : Array[Double] = cuts_input.split(",")(2).split(" ").map(_.toDouble)
 
 //-----------------------------
+
+def compute_ecdf(x : org.apache.spark.rdd.RDD[Double]) : org.apache.spark.rdd.RDD[(Double, Double)] ={
+    val counts = x.map( v => (v,1)).reduceByKey(_+_).sortByKey().cache()
+    // compute the partition sums
+    val partSums: Array[Double] = 0.0 +: counts.mapPartitionsWithIndex {
+      case (index, partition) => Iterator(partition.map { case (sample, count) => count }.sum.toDouble)
+    }.collect()
+    
+    // get sample size
+    val numValues = partSums.sum
+    
+    // compute empirical cumulative distribution
+    val sumsRdd = counts.mapPartitionsWithIndex {
+      case (index, partition) => {
+        var startValue = 0.0
+        for (i <- 0 to index) {
+          startValue += partSums(i)
+        }
+        partition.scanLeft((0.0, startValue))((prev, curr) => (curr._1, prev._2 + curr._2)).drop(1)
+      }
+    }
+    sumsRdd.map( elem => (elem._1, elem._2 / numValues))
+}
+
+def distributed_quantiles(quantiles: Array[Double], ecdf: org.apache.spark.rdd.RDD[(Double, Double)]): Array[Double] ={
+    def dqSeqOp(acc: Array[Double], value: (Double, Double) ) : Array[Double]= { 
+        var newacc: Array[Double] = acc
+        for ( (quant, pos) <- quantiles.zipWithIndex) {
+            newacc(pos) = if (value._2 < quant ) {max(newacc(pos), value._1)}else{newacc(pos)}
+        }
+        acc
+    }
+    
+    def dqCombOp(acc1: Array[Double], acc2: Array[Double]) = { (acc1 zip acc2).map(tuple => max(tuple._1, tuple._2)) }
+    
+    ecdf.aggregate(Array.fill[Double](quantiles.length)(0)) ((acc, value) =>dqSeqOp(acc, value), (acc1, acc2)=>dqCombOp(acc1, acc2))
+}
+
+def bin_column(value: String, cuts: Array[Double]) = {
+    var bin = 0
+    for (cut <- cuts){ if (value.toDouble > cut) { bin = bin+1 } }
+    bin.toString
+}
 
 val rawdata = sc.textFile(file)
 //Array(tr, try, trm, trd, trh, trm, trs, td, sa, da, sp, dp, pr, flg, fwd, stos, ipkt, ibyt, opkt, obyt, in, out, sas, das, dtos, dir, ra)
 //2015-04-12 00:01:06,2015,4,12,0,1,6,1.340,10.0.121.115,192.168.1.33,80,54048,TCP,.AP.SF,0,0,9,5084,0,0,2,3,0,0,0,0,10.219.32.250
 
 val datanoheader = removeHeader(rawdata)
-val sample = datanoheader.sample(false, .0001, 12345)
-//val datagood = datanoheader.filter(line => line.split(",").length == 27)
-val datagood = sample.filter(line => line.split(",").length == 27)
-val databad = datanoheader.filter(line => line.split(",").length != 27)
-//var s1 = datagood.first.trim.split(",")
+val datagood = datanoheader.filter(line => line.split(",").length == 27)
 
 def add_time(row: Array[String]) = {
     val num_time = row(4).toDouble + row(5).toDouble/60 + row(6).toDouble/3600
@@ -77,7 +121,19 @@ def add_time(row: Array[String]) = {
 }
 
 val data_with_time = datagood.map(_.trim.split(",")).map(add_time)
-//s1 = add_time(s1)
+/
+if (compute_quantiles == true){
+    println("calculating time cuts ...")
+    time_cuts = distributed_quantiles(quant, compute_ecdf(data_with_time.map(r => row(27).toDouble )))
+    println(time_cuts.mkString(",") )
+    println("calculating byte cuts ...")
+    ibyt_cuts = distributed_quantiles(quant, compute_ecdf(data_with_time.map(r => row(17).toDouble )))
+    println("ibyt_cuts.mkString(",") )
+    println("calculating pkt cuts")
+    ipkt_cuts = distributed_quantiles(quint, compute_ecdf(data_with_time.map(r => row(16).toDouble )))
+    println(ipkt_cuts.mkString(",") )
+}
+
 
 def bin_ibyt_ipkt_time(row: Array[String], 
                        ibyt_cuts: Array[Double], 
