@@ -41,7 +41,7 @@ cat part-* > doc_wc.dat
 rm -f part-*
 
 #   lda  stage
-source /etc/duxbay.conf
+source /etc/oni.conf
 cd ..
 time python lda_pre.py ${LPATH}/
 rm -f ${LPATH}/doc_wc.dat
@@ -64,7 +64,7 @@ time python lda_post.py ${LPATH}/
 
 
 # post-processing stage
-source /etc/duxbay.conf
+source /etc/oni.conf
 export DPATH
 export HPATH
 export TOL
