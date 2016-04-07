@@ -71,12 +71,10 @@ class SimpleCSVHeader(header:Array[String]) extends Serializable {
 //26                  rip: String)
 
 //----------Inputs-------------
-//val file = "/user/history/hiveflow/netflow/year=2015/month=6/day=18/hour=0/*"
 val file = System.getenv("DPATH")
-//val output_file = "/user/history/hiveflow/netflow/word_counts_for_20150618"
 val output_file = System.getenv("HPATH") + "/word_counts"
-//val output_file_for_lda = "/user/history/hiveflow/netflow/lda_word_counts_for_20150618"
-val output_file_for_lda = System.getenv("HPATH") + "/lda_word_counts"
+val feedback_file = System.getenv("DPATH") + "/feedback"
+val duplication_factor = 1000
 val compute_quantiles : Boolean = false
 val quant = Array(0.1,0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9)
 val cuts_input = System.getenv("CUT")
@@ -118,7 +116,30 @@ def quantiles(quantiles: Array[Double], ecdf: org.apache.spark.rdd.RDD[(Double, 
 }
 
 
-val rawdata = sc.textFile(file)
+var multidata = {
+    var tempRDD: org.apache.spark.rdd.RDD[String] = sc.textFile( file_list.split(",")(0) )
+    val files = file_list.split(",")
+    for ( (file, index) <- files.zipWithIndex){
+        if (index > 1) {tempRDD = tempRDD.union(sc.textFile(file))}
+    }
+    tempRDD
+}
+
+var rawdata :org.apache.spark.rdd.RDD[String] = {
+    if (feedback_file == "None") { multidata
+    }else {
+        var data :org.apache.spark.rdd.RDD[String] = multidata
+        val feedback :org.apache.spark.rdd.RDD[String] = sc.textFile(feedback_file)
+        val falsepositives = feedback.filter(line => line.split(",").last == "3")
+        var i = 1
+        while (i < duplication_factor) {
+            data = data.union(falsepositives)
+            i = i+1
+        }
+    data        
+    }
+}
+
 
 val datanoheader = removeHeader(rawdata)
 val sample = datanoheader.sample(false, .0001, 12345)
