@@ -3,7 +3,7 @@
 NFTABLE=netflow
 QTILES='qtiles.tsv'
 DSOURCE='flow'
-source /etc/duxbay.conf
+source /etc/oni.conf
 
 
 echo "generating byte deciles ..."

@@ -14,7 +14,7 @@ DFOLDER='hive'
 
 #  pre-processing scala
 
-source /etc/duxbay.conf
+source /etc/oni.conf
 export DPATH
 export HPATH
 export LUSER
@@ -41,7 +41,7 @@ cat part-* > doc_wc.dat
 rm -f part-*
 
 #   lda  stage
-source /etc/duxbay.conf
+source /etc/oni.conf
 cd ..
 time python lda_pre.py ${LPATH}/
 rm -f ${LPATH}/doc_wc.dat
@@ -56,7 +56,10 @@ do
 done
 sleep 2
 cd ${LDAPATH}
-time mpiexec -n 20 -f machinefile ./lda est 2.5 20 settings.txt ../${FDATE}/model.dat random ../${FDATE}
+source /opt/intel/compilers_and_libraries/linux/mpi/bin64/mpivars.sh
+
+
+time mpiexec.hydra -n 65 -f machinefile ./lda est 2.5 20 settings.txt ../${FDATE}/model.dat random ../${FDATE}
 sleep 10
 
 cd ${LUSER}/ml
@@ -64,7 +67,7 @@ time python lda_post.py ${LPATH}/
 
 
 # post-processing stage
-source /etc/duxbay.conf
+source /etc/oni.conf
 export DPATH
 export HPATH
 export TOL
@@ -89,7 +92,7 @@ cat part-* > ${DSOURCE}_results.csv
 rm -f part-*
 
 #op ml stage         Ingest results_all_20150618.csv into suspicious connects front end
-source /etc/duxbay.conf
+source /etc/oni.conf
 
  #scp to UI node
  scp -r ${LPATH} ${UINODE}:${RPATH}

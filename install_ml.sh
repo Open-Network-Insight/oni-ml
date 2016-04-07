@@ -1,7 +1,7 @@
  #!/bin/bash
  
  #   lda  stage
-source /etc/duxbay.conf
+source /etc/oni.conf
 
 #  copy solution files to all nodes 
 # use array scp 
