@@ -61,8 +61,9 @@ val file_list = System.getenv("DPATH")
 val feedback_file = "None"
 val duplication_factor = 100
 val outputfile = System.getenv("HPATH")  + /word_counts"
-//val quant = Array(0, 0.1,0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9)
-val quant = Array(0, 0.2, 0.4, 0.6, 0.8)
+val quant = Array(0, 0.1,0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9)
+val quint = Array(0, 0.2, 0.4, 0.6, 0.8)
+var time_cuts = new Array[Double](5)
 var frame_length_cuts = new Array[Double](5)
 var subdomain_length_cuts = new Array[Double](5)
 var numperiods_cuts = new Array[Double](5)
@@ -249,17 +250,21 @@ data_with_subdomains = data_with_subdomains.map(data => data :+ entropy(data(col
 addcol("subdomain.entropy")
 
 if (compute_quantiles == true){
+    //println("calculating time cuts ...")
+    //time_cuts = distributed_quantiles(quant, compute_ecdf(data_with_subdomains.map(r => r(col("unix_timestamp")).toDouble )))
+    //println(time_cuts.mkString(",") )
+    
     println("calculating frame length cuts ...")
     frame_length_cuts = distributed_quantiles(quant, compute_ecdf(data_with_subdomains.map(r => r(col("frame.len")).toDouble )))
     println(frame_length_cuts.mkString(",") )
     println("calculating subdomain length cuts ...")
-    subdomain_length_cuts = distributed_quantiles(quant, compute_ecdf(data_with_subdomains.filter(r => r(col("subdomain.length")).toDouble > 0 ).map(r => r(col("subdomain.length")).toDouble )))
+    subdomain_length_cuts = distributed_quantiles(quint, compute_ecdf(data_with_subdomains.filter(r => r(col("subdomain.length")).toDouble > 0 ).map(r => r(col("subdomain.length")).toDouble )))
     println(subdomain_length_cuts.mkString(",") )
     println("calculating entropy cuts")
-    entropy_cuts = distributed_quantiles(quant, compute_ecdf(data_with_subdomains.filter(r => r(col("subdomain.entropy")).toDouble > 0 ).map(r => r(col("subdomain.entropy")).toDouble )))
+    entropy_cuts = distributed_quantiles(quint, compute_ecdf(data_with_subdomains.filter(r => r(col("subdomain.entropy")).toDouble > 0 ).map(r => r(col("subdomain.entropy")).toDouble )))
     println(entropy_cuts.mkString(",") )
     println("calculating num periods cuts ...")
-    numperiods_cuts = distributed_quantiles(quant, compute_ecdf(data_with_subdomains.filter(r => r(col("num.periods")).toDouble > 0 ).map(r => r(col("num.periods")).toDouble )))
+    numperiods_cuts = distributed_quantiles(quint, compute_ecdf(data_with_subdomains.filter(r => r(col("num.periods")).toDouble > 0 ).map(r => r(col("num.periods")).toDouble )))
     println(numperiods_cuts.mkString(",") )
 }
 println("count after cuts")
@@ -276,7 +281,7 @@ print_rdd(data)
 
 println("adding words")
 data = data.map(row => {
-        val word = row(col("top_domain")) + "_" + bin_column(row(col("frame.len")), frame_length_cuts) + "_" + 
+        val word = row(col("top_domain")) + "_" + bin_column(row(col("frame.len")), frame_length_cuts) + "_" + //  bin_column(row(col("unix_timestamp")), time_cuts) + "_" +
         	bin_column(row(col("subdomain.length")), subdomain_length_cuts) + "_" +
                 bin_column(row(col("subdomain.entropy")), entropy_cuts) + "_" +  
 		bin_column(row(col("num.periods")), numperiods_cuts) + "_" + row(col("dns.qry.type"))+ "_" +row(col("dns.flags.rcode"))
