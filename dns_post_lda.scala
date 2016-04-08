@@ -64,6 +64,7 @@ val threshold : Double = System.getenv("TOL").toDouble
 
 val quant = Array(0, 0.1,0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9)
 val quint = Array(0, 0.2, 0.4, 0.6, 0.8)
+var time_cuts = new Array[Double](10)
 var frame_length_cuts = new Array[Double](5)
 var subdomain_length_cuts = new Array[Double](5)
 var numperiods_cuts = new Array[Double](5)
