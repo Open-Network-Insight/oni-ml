@@ -161,7 +161,7 @@ def extract_subdomain(url: String): Array[String ]= {
     //first check if query is an Ip address e.g.: 123.103.104.10.in-addr.arpa or a name
     val is_ip ={ if (numparts>2){if (spliturl(numparts-1) == "arpa" & spliturl(numparts-2) == "in-addr"){"IP"} else "Name"} else "Unknown" }
     
-    if (numparts>2 & is_ip !="IP"){
+    if (numparts>2 && is_ip !="IP"){
         //This might try to parse things with only 1 or 2 numparts
         //test if last element is a country code or tld
         //use: Array(spliturl(numparts-1)).exists(country_codes contains _)
@@ -170,12 +170,12 @@ def extract_subdomain(url: String): Array[String ]= {
             //country = spliturl(numparts-1)
             //tld = {if(Array(spliturl(numparts-2)).exists(tlds.value contains _)){spliturl(numparts-2)} else "None" }
             domain = spliturl(numparts-3)
-            if (1<numparts-3){ subdomain = spliturl.slice(1,numparts-3).mkString(".") } 
+            if (1<=numparts-3){ subdomain = spliturl.slice(0,numparts-3).mkString(".") } 
         }
         else{
             //tld = {if(Array(spliturl(numparts-1)).exists(tlds contains _)){spliturl(numparts-1)} else "None" }
             domain = spliturl(numparts-2)
-            if (1<numparts-2){ subdomain = spliturl.slice(1,numparts-2).mkString(".") }
+            if (1<=numparts-2){ subdomain = spliturl.slice(0,numparts-2).mkString(".") }
         }
     }
     //Array(domain, subdomain, host, country, tld, numparts.toString, { if (subdomain !="None"){subdomain.length.toString} else {"0"}}, url.length.toString, is_ip )
