@@ -60,7 +60,7 @@ def toDouble(s: String, default:Double=Double.NaN) = {if (isNumeric(s)) s.toDoub
 val file_list = System.getenv("DPATH")
 val feedback_file = "None"
 val duplication_factor = 100
-val outputfile = System.getenv("HPATH")  + /word_counts"
+val outputfile = System.getenv("HPATH")  + "/word_counts"
 val quant = Array(0, 0.1,0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9)
 val quint = Array(0, 0.2, 0.4, 0.6, 0.8)
 var time_cuts = new Array[Double](5)
