@@ -141,13 +141,13 @@ val data_with_time = datagood.map(_.trim.split(",")).map(add_time)
 
 if (compute_quantiles == true){
     println("calculating time cuts ...")
-    time_cuts = distributed_quantiles(quant, compute_ecdf(data_with_time.map(r => row(27).toDouble )))
+    time_cuts = distributed_quantiles(quant, compute_ecdf(data_with_time.map(row => row(27).toDouble )))
     println(time_cuts.mkString(",") )
     println("calculating byte cuts ...")
-    ibyt_cuts = distributed_quantiles(quant, compute_ecdf(data_with_time.map(r => row(17).toDouble )))
-    println("ibyt_cuts.mkString(",") )
+    ibyt_cuts = distributed_quantiles(quant, compute_ecdf(data_with_time.map(row => row(17).toDouble )))
+    println(ibyt_cuts.mkString(",") )
     println("calculating pkt cuts")
-    ipkt_cuts = distributed_quantiles(quint, compute_ecdf(data_with_time.map(r => row(16).toDouble )))
+    ipkt_cuts = distributed_quantiles(quint, compute_ecdf(data_with_time.map(row => row(16).toDouble )))
     println(ipkt_cuts.mkString(",") )
 }
 
