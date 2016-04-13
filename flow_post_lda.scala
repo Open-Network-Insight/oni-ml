@@ -242,7 +242,7 @@ val src_scored = data_with_words.map(row => {
 //src_scored.take(10)
 
 
-var scored = src_scored.filter(elem => min(elem._1,elem._2) < threshold).sortByKey().map( row => row._3.mkString(",") )
+var scored = src_scored.filter(elem => min(elem._1,elem._2) < threshold)().map( row => row._3.mkString(",") )
 
 scored.persist(StorageLevel.MEMORY_AND_DISK)
 scored.saveAsTextFile(scored_output_file)
