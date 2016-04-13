@@ -127,8 +127,7 @@ val rawdata = sc.textFile(file)
 //2015-04-12 00:01:06,2015,4,12,0,1,6,1.340,10.0.121.115,192.168.1.33,80,54048,TCP,.AP.SF,0,0,9,5084,0,0,2,3,0,0,0,0,10.219.32.250
 
 val datanoheader = removeHeader(rawdata)
-val datagood = sample.filter(line => line.split(",").length == 27)
-//val databad = datanoheader.filter(line => line.split(",").length != 27)
+val datagood = datanoheader.filter(line => line.split(",").length == 27)
 
 //Array(tr, try, trm, trd, trh, trm, trs, td, sa, da, sp, dp, pr, flg, fwd, stos, ipkt, ibyt, opkt, obyt, in, out, sas, das, dtos, dir, ra)
 
