@@ -128,7 +128,6 @@ val rawdata = sc.textFile(file)
 
 val datanoheader = removeHeader(rawdata)
 val datagood = datanoheader.filter(line => line.split(",").length == 27)
-//val databad = datanoheader.filter(line => line.split(",").length != 27)
 
 //Array(tr, try, trm, trd, trh, trm, trs, td, sa, da, sp, dp, pr, flg, fwd, stos, ipkt, ibyt, opkt, obyt, in, out, sas, das, dtos, dir, ra)
 
