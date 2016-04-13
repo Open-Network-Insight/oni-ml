@@ -224,7 +224,7 @@ def adjust_port(row: Array[String]) = {
 val data_with_words = binned_data.map(row => adjust_port(row))
 
 
-val src_scored = data.map(row => {
+val src_scored = data_with_words.map(row => {
 	val topic_mix_1 = topics.value.getOrElse(row(8),Array(0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05) ).asInstanceOf[Array[Double]]
 	val word_prob_1 = words.value.getOrElse(row(33),Array(0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05) ).asInstanceOf[Array[Double]]
 	val topic_mix_2 = topics.value.getOrElse(row(9),Array(0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05) ).asInstanceOf[Array[Double]]
@@ -242,7 +242,7 @@ val src_scored = data.map(row => {
 //src_scored.take(10)
 
 
-var scored = src_scored.filter(elem => min(elem._1,elem._2) < threshold).sortByKey().map( row => row._3.mkString(",") )
+var scored = src_scored.filter(elem => min(elem._1,elem._2) < threshold)().map( row => row._3.mkString(",") )
 
 scored.persist(StorageLevel.MEMORY_AND_DISK)
 scored.saveAsTextFile(scored_output_file)
