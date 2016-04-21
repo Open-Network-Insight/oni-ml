@@ -23,6 +23,16 @@ export LUSER
 export TOL
 export KRB_AUTH
 
+#check for missing variables
+if [[ -z $FDATE || -z $YR || -z $MH || -z $DY || -z $DSOURCE || -z $TOL ]];
+    then
+        echo ""
+        echo "please enter the date code and data source"
+        echo "example: \"./ml_ops.sh 19700101 1970 01 01 flow 10\""
+        echo ""
+        exit 1
+fi
+
 hadoop fs -rm -R ${HPATH}/word_counts
 hadoop fs -rm -R ${HPATH}/lda_word_counts
 
