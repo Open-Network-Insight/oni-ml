@@ -195,22 +195,3 @@ word_counts.persist(StorageLevel.MEMORY_AND_DISK)
 word_counts.take(10).foreach(println)
 
 word_counts.saveAsTextFile(outputfile)
-
-
-val result = word_counts.map( row => (row.split(",")(0), (row.split(",")(1), row.split(",")(2).toDouble.asInstanceOf[Long]))).aggregateByKey(Map[String,Long]())( (accum,value) => accum +(value._1 -> value._2), (accum1, accum2) => accum1 ++ accum2).map{ case (ip: String, wordMap: Map[String,Long]) => {
-    val array = wordMap.toArray
-    (ip, array)
-    }}
-
-val result2 = result.map( row =>{
-    val ip = row._1
-    val array = row._2
-    val num_words = array.length
-    val x = array.map(t => t._1.toString+":"+t._2.toString).mkString(",")
-    ip +","+num_words+","+x
-    })
-
-//result2.take(10)
-result2.saveAsTextFile(output_file_for_lda)
-
-

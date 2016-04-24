@@ -170,7 +170,7 @@ def bin_ibyt_ipkt_time(row: Array[String],
     for (cut <- time_cuts){
         if (time > cut) { time_bin = time_bin+1 }
     }
-    row.clone :+ ibyt_bin.toString :+ ipkt_bin.toString :+ time_bin.toString
+    row :+ ibyt_bin.toString :+ ipkt_bin.toString :+ time_bin.toString
 }
 
 //s1 = bin_ibyt_ipkt_time(row = s1, ibyt_cuts, ipkt_cuts, time_cuts)
@@ -217,32 +217,32 @@ def adjust_port(row: Array[String]) = {
     }else if (p_case == 4 & dport == 0){  src_word = "-1_"+src_word
     }else if (p_case == 4 & sport ==0){ dest_word = "-1_"+dest_word }
     
-    row.clone :+ word_port.toString :+ ip_pair :+ src_word.toString :+ dest_word.toString
+    row :+ word_port.toString :+ ip_pair :+ src_word.toString :+ dest_word.toString
 }
 
 //s1 = adjust_port(s1)
 val data_with_words = binned_data.map(row => adjust_port(row))
 
 
-val src_scored = data.map(row => {
+val src_scored = data_with_words.map(row => {
 	val topic_mix_1 = topics.value.getOrElse(row(8),Array(0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05) ).asInstanceOf[Array[Double]]
 	val word_prob_1 = words.value.getOrElse(row(33),Array(0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05) ).asInstanceOf[Array[Double]]
 	val topic_mix_2 = topics.value.getOrElse(row(9),Array(0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05) ).asInstanceOf[Array[Double]]
-	val word_prob_2 = words.value.getOrElse(row(44),Array(0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05) ).asInstanceOf[Array[Double]]
+	val word_prob_2 = words.value.getOrElse(row(34),Array(0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05) ).asInstanceOf[Array[Double]]
         var src_score = 0.0 
         var dest_score = 0.0 
 	for ( i <- 0 to 19) {
 		 src_score += topic_mix_1(i) * word_prob_1(i)
 		 dest_score += topic_mix_2(i) * word_prob_2(i)
       	}
-	(src_score, dest_score, row :+ src_score :+ dest_score)
+	 (min(src_score, dest_score), row :+ src_score :+ dest_score)
 	})
 
 
 //src_scored.take(10)
 
 
-var scored = src_scored.filter(elem => min(elem._1,elem._2) < threshold).sortByKey().map( row => row._3.mkString(",") )
+var scored = src_scored.filter(elem => elem._1 < threshold).sortByKey().map( row => row._2.mkString(",") )
 
 scored.persist(StorageLevel.MEMORY_AND_DISK)
 scored.saveAsTextFile(scored_output_file)
