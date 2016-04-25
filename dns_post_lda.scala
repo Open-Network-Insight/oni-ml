@@ -26,9 +26,9 @@ def removeHeader(input: org.apache.spark.rdd.RDD[String]) = {
 }
 
 
-def get_column_names(input: org.apache.spark.rdd.RDD[String], sep : Char = ',') : scala.collection.mutable.Map[String, Int] = {
+def get_column_names(input: Array[String], sep : Char = ',') : scala.collection.mutable.Map[String, Int] = {
     val columns = scala.collection.mutable.Map[String, Int]()
-    val header = input.first.split(sep).zipWithIndex
+    val header = input.zipWithIndex
     header.foreach(tuple => columns(tuple._1) = tuple._2)
     columns
 }
@@ -65,11 +65,12 @@ val threshold : Double = System.getenv("TOL").toDouble
 val quant = Array(0, 0.1,0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9)
 val quint = Array(0, 0.2, 0.4, 0.6, 0.8)
 var time_cuts = new Array[Double](10)
-var frame_length_cuts = new Array[Double](5)
+var frame_length_cuts = new Array[Double](10)
 var subdomain_length_cuts = new Array[Double](5)
 var numperiods_cuts = new Array[Double](5)
 var entropy_cuts = new Array[Double](5)
 val compute_quantiles = true
+var df_cols = new Array[String](0)
 
 val l_top_domains = Source.fromFile("top-1m.csv").getLines.map(line => {
                       val parts = line.split(",")
@@ -105,11 +106,15 @@ val words = sc.broadcast(l_words)
 //-----------------------------
 
 var multidata = {
-    var tempRDD: org.apache.spark.rdd.RDD[String] = sc.textFile( file_list.split(",")(0) )
+    var df = sqlContext.parquetFile( file_list.split(",")(0) ).filter("frame_len is not null")
     val files = file_list.split(",")
     for ( (file, index) <- files.zipWithIndex){
-        if (index > 1) {tempRDD = tempRDD.union(sc.textFile(file))}
+        if (index > 1) {
+	    df = df.unionAll(sqlContext.parquetFile(file).filter("frame_len is not null"))
+	}
     }
+    df_cols = df.columns
+    val tempRDD: org.apache.spark.rdd.RDD[String] = df.map(_.mkString(","))
     tempRDD
 }
 var rawdata :org.apache.spark.rdd.RDD[String] = {
@@ -117,11 +122,12 @@ var rawdata :org.apache.spark.rdd.RDD[String] = {
 }
 
 // only needed if the schema is different than the standard solution setup
-//val indices: Array[Int] = Array(0,1,2,8,9,10,11,12,13,14)
-//rawdata = rawdata.map(line => line.split(",")).map(inner => indices.map(inner).mkString(","))
+// only needed if the schema is different than the standard solution setup
+val indices: Array[Int] = Array(0,1,2,3,4,5,6,7,8)
+rawdata = rawdata.map(line => line.split(",")).map(inner => indices.map(inner).mkString(","))
 rawdata.take(10).foreach(println)
 
-val col = get_column_names(rawdata)
+val col = get_column_names(df_cols)
 
 //frame.time_epoch  frame.len  ip.src  ip.dst  dns.qry.name  dns.qry.type  dns.qry.class  dns.flags.rcode  dns.a 
 
@@ -129,9 +135,9 @@ def addcol(colname: String) = if (!col.keySet.exists(_==colname) ){col(colname) 
 
 
 
-val datanoheader = removeHeader(rawdata)
+val datanoheader = rawdata
 //print_rdd(datagood)
-val datagood = datanoheader.map(line => line.split(",") ).filter(line => (line.length == 9))
+val datagood = datanoheader.map(line => line.split(",") ).filter(line => (line.length == df_cols.length))
 
 //val databad = datanoheader.filter(line => (line.split(",").length != 24 & line.split(",").length != 23))
 
@@ -181,7 +187,7 @@ def extract_subdomain(url: String): Array[String ]= {
 }
 println("Computing subdomain info")
 
-var data_with_subdomains = datagood.map(row => row ++ extract_subdomain(row(col("dns.qry.name")) ) )
+var data_with_subdomains = datagood.map(row => row ++ extract_subdomain(row(col("dns_qry_name")) ) )
 addcol("domain")
 addcol("subdomain")
 addcol("subdomain.length")
@@ -249,11 +255,12 @@ addcol("subdomain.entropy")
 
 
 if (compute_quantiles == true){
-    //println("calculating time cuts ...")
-    //time_cuts = distributed_quantiles(quant, compute_ecdf(data_with_subdomains.map(r => r(col("unix_timestamp")).toDouble )))
-    //println(time_cuts.mkString(",") )
+    println("calculating time cuts ...")
+    time_cuts = distributed_quantiles(quant, compute_ecdf(data_with_subdomains.map(r => r(col("unix_tstamp")).toDouble )))
+    println(time_cuts.mkString(",") )    
+
     println("calculating frame length cuts ...")
-    frame_length_cuts = distributed_quantiles(quant, compute_ecdf(data_with_subdomains.map(r => r(col("frame.len")).toDouble )))
+    frame_length_cuts = distributed_quantiles(quant, compute_ecdf(data_with_subdomains.map(r => r(col("frame_len")).toDouble )))
     println(frame_length_cuts.mkString(",") )
     println("calculating subdomain length cuts ...")
     subdomain_length_cuts = distributed_quantiles(quint, compute_ecdf(data_with_subdomains.filter(r => r(col("subdomain.length")).toDouble > 0 ).map(r => r(col("subdomain.length")).toDouble )))
@@ -280,10 +287,11 @@ print_rdd(data)
 
 println("adding words")
 data = data.map(row => {
-        val word = row(col("top_domain")) + "_" + bin_column(row(col("frame.len")), frame_length_cuts) + "_" + //  bin_column(row(col("unix_timestamp")), time_cuts) + "_" +
+        val word = row(col("top_domain")) + "_" + bin_column(row(col("frame_len")), frame_length_cuts) + "_" + 
+		bin_column(row(col("unix_tstamp")), time_cuts) + "_" +
         	bin_column(row(col("subdomain.length")), subdomain_length_cuts) + "_" +
                 bin_column(row(col("subdomain.entropy")), entropy_cuts) + "_" +  
-		bin_column(row(col("num.periods")), numperiods_cuts) + "_" + row(col("dns.qry.type"))+ "_" +row(col("dns.flags.rcode"))
+		bin_column(row(col("num.periods")), numperiods_cuts) + "_" + row(col("dns_qry_type"))+ "_" +row(col("dns_qry_rcode"))
 row :+ word} )
 addcol("word")
 
@@ -301,7 +309,7 @@ print_columns(col)
 println("Computing conditional probability")
 
 val src_scored = data.map(row => {
-	val topic_mix = topics.value.getOrElse(row(col("id.orig_h")),Array(0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1) ).asInstanceOf[Array[Double]]
+	val topic_mix = topics.value.getOrElse(row(col("ip_dst")),Array(0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1) ).asInstanceOf[Array[Double]]
 	val word_prob = words.value.getOrElse(row(col("word")),Array(0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1) ).asInstanceOf[Array[Double]]
         var src_score = 0.0 
 	for ( i <- 0 to 19) {
@@ -316,8 +324,8 @@ src_scored.take(10)
 
 var scored = src_scored.filter(elem => elem._1 < threshold).sortByKey().map( row => row._2.mkString(",") )
 //var scored = src_scored.top(elem => elem._1 < threshold).sortByKey().map( row => row._2.mkString(",") )
-
 println(scored.count() )
+scored.take(10).foreach(println)
 scored.persist(StorageLevel.MEMORY_AND_DISK)
 scored.saveAsTextFile(scored_output_file)
 
