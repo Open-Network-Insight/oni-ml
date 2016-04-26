@@ -1,13 +1,12 @@
 #!/bin/bash
 
 # read in variables (except for date) from etc/.conf file
-
 FDATE=$1
-YR=$2
-MH=$3
-DY=$4
-DSOURCE=$5
-TOL=$6
+DSOURCE=$2
+TOL=$3
+YR=${FDATE:0:4}
+MH=${FDATE:4:2}
+DY=${FDATE:6:2}
 
 # intermediate ML results go in hive directory
 DFOLDER='hive'
