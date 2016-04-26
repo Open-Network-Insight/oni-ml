@@ -58,7 +58,7 @@ do
 done
 sleep 2
 cd ${LDAPATH}
-PROCESS_COUNT = 20
+PROCESS_COUNT=20
 time mpiexec -n ${PROCESS_COUNT} -f machinefile ./lda est 2.5 20 settings.txt ${PROCESS_COUNT} ../${FDATE}/model.dat random ../${FDATE}
 sleep 10
 
