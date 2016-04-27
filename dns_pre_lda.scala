@@ -97,6 +97,7 @@ var multidata = {
 	    df = df.unionAll(sqlContext.parquetFile(file).filter("frame_len is not null"))
 	}
     }
+    df =  df.select("frame_time","unix_tstamp","frame_len", "ip_dst", "dns_qry_name", "dns_qry_class", "dns_qry_type", "dns_qry_rcode")
     df_cols = df.columns
     val tempRDD: org.apache.spark.rdd.RDD[String] = df.map(_.mkString(",")) 
     tempRDD
@@ -118,8 +119,8 @@ var rawdata :org.apache.spark.rdd.RDD[String] = {
 }
 
 // only needed if the schema is different than the standard solution setup
-val indices: Array[Int] = Array(0,1,2,3,4,5,6,7,8)
-rawdata = rawdata.map(line => line.split(",")).map(inner => indices.map(inner).mkString(","))
+//val indices: Array[Int] = Array(0,1,2,3,4,5,6,7,8)
+//rawdata = rawdata.map(line => line.split(",")).map(inner => indices.map(inner).mkString(","))
 
 //print_lines(rawdata)
 println(rawdata.count())
