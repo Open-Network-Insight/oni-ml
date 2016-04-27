@@ -11,6 +11,8 @@ TOL=$6
 
 # intermediate ML results go in hive directory
 DFOLDER='hive'
+DUPFACTOR=1000
+export DUPFACTOR
 
 #  pre-processing scala
 
@@ -24,8 +26,8 @@ export KRB_AUTH
 hadoop fs -rm -R ${HPATH}/word_counts
 hadoop fs -rm -R ${HPATH}/lda_word_counts
 
-CUT=$(<${DSOURCE}_qtiles)
-export CUT
+#CUT=$(<${DSOURCE}_qtiles)
+#export CUT
 
 #kinit -kt /etc/security/keytabs/smokeuser.headless.keytab <user-id>
 time spark-shell --master yarn-client --executor-memory  ${SPK_EXEC_MEM}  --driver-memory 2g --num-executors ${SPK_EXEC} --executor-cores 1 --conf spark.shuffle.io.preferDirectBufs=false --conf shuffle.service.enabled=true --conf spark.driver.maxResultSize="2g"  -i scala ${DSOURCE}_pre_lda.scala
@@ -56,7 +58,8 @@ do
 done
 sleep 2
 cd ${LDAPATH}
-time mpiexec -n 20 -f machinefile ./lda est 2.5 20 settings.txt ../${FDATE}/model.dat random ../${FDATE}
+PROCESS_COUNT=20
+time mpiexec -n ${PROCESS_COUNT} -f machinefile ./lda est 2.5 20 settings.txt ${PROCESS_COUNT} ../${FDATE}/model.dat random ../${FDATE}
 sleep 10
 
 cd ${LUSER}/ml

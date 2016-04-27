@@ -52,24 +52,84 @@ val pword_file = System.getenv("HPATH")+"/word_results.csv"
 val scored_output_file = System.getenv("HPATH") + "/scored"
 val threshold : Double = System.getenv("TOL").toDouble
 
-
-val cuts_input = System.getenv("CUT")
-var ibyt_cuts : Array[Double] = cuts_input.split(",")(0).split(" ").map(_.toDouble)
-var ipkt_cuts : Array[Double] = cuts_input.split(",")(1).split(" ").map(_.toDouble)
-var time_cuts : Array[Double] = cuts_input.split(",")(2).split(" ").map(_.toDouble)
+val compute_quantiles : Boolean = true
+val quant = Array(0.1,0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9)
+val quint = Array(0, 0.2, 0.4, 0.6, 0.8)
+var ibyt_cuts = new Array[Double](10)
+var ipkt_cuts = new Array[Double](5)
+var time_cuts = new Array[Double](10)
 
 //-----------------------------
 
+def compute_ecdf(x : org.apache.spark.rdd.RDD[Double]) : org.apache.spark.rdd.RDD[(Double, Double)] ={
+    val counts = x.map( v => (v,1)).reduceByKey(_+_).sortByKey().cache()
+    // compute the partition sums
+    val partSums: Array[Double] = 0.0 +: counts.mapPartitionsWithIndex {
+      case (index, partition) => Iterator(partition.map { case (sample, count) => count }.sum.toDouble)
+    }.collect()
+    
+    // get sample size
+    val numValues = partSums.sum
+    
+    // compute empirical cumulative distribution
+    val sumsRdd = counts.mapPartitionsWithIndex {
+      case (index, partition) => {
+        var startValue = 0.0
+        for (i <- 0 to index) {
+          startValue += partSums(i)
+        }
+        partition.scanLeft((0.0, startValue))((prev, curr) => (curr._1, prev._2 + curr._2)).drop(1)
+      }
+    }
+    sumsRdd.map( elem => (elem._1, elem._2 / numValues))
+}
+
+def distributed_quantiles(quantiles: Array[Double], ecdf: org.apache.spark.rdd.RDD[(Double, Double)]): Array[Double] ={
+    def dqSeqOp(acc: Array[Double], value: (Double, Double) ) : Array[Double]= { 
+        var newacc: Array[Double] = acc
+        for ( (quant, pos) <- quantiles.zipWithIndex) {
+            newacc(pos) = if (value._2 < quant ) {max(newacc(pos), value._1)}else{newacc(pos)}
+        }
+        acc
+    }
+    
+    def dqCombOp(acc1: Array[Double], acc2: Array[Double]) = { (acc1 zip acc2).map(tuple => max(tuple._1, tuple._2)) }
+    
+    ecdf.aggregate(Array.fill[Double](quantiles.length)(0)) ((acc, value) =>dqSeqOp(acc, value), (acc1, acc2)=>dqCombOp(acc1, acc2))
+}
+
+println("loading machine learning results")
+val topics_lines = sc.textFile(topic_mix_file)
+//print(topics_lines)
+val words_lines = sc.textFile(pword_file)
+//print(words_lines)
+
+val l_topics = topics_lines.map(line => {
+    val ip = line.split(",")(0)
+    val text = line.split(",")(1)
+    val text_no_quote = text.replaceAll("\"", "").split(" ").map(v => v.toDouble)
+    (ip,text_no_quote)
+    }).map(elem => elem._1 -> elem._2).collectAsMap()
+
+val topics = sc.broadcast(l_topics)
+
+val l_words = words_lines.map(line => {
+    val word = line.split(",")(0)
+    val text = line.split(",")(1)
+    val text_no_quote = text.replaceAll("\"", "").split(" ").map(v => v.toDouble)
+    (word, text_no_quote)
+    }).map(elem => elem._1 -> elem._2).collectAsMap()
+
+val words = sc.broadcast(l_words)
+
+println("loading data")
 val rawdata = sc.textFile(file)
-//Array(tr, try, trm, trd, trh, trm, trs, td, sa, da, sp, dp, pr, flg, fwd, stos, ipkt, ibyt, opkt, obyt, in, out, sas, das, dtos, dir, ra)
 //2015-04-12 00:01:06,2015,4,12,0,1,6,1.340,10.0.121.115,192.168.1.33,80,54048,TCP,.AP.SF,0,0,9,5084,0,0,2,3,0,0,0,0,10.219.32.250
 
 val datanoheader = removeHeader(rawdata)
-val sample = datanoheader.sample(false, .0001, 12345)
-//val datagood = datanoheader.filter(line => line.split(",").length == 27)
-val datagood = sample.filter(line => line.split(",").length == 27)
-val databad = datanoheader.filter(line => line.split(",").length != 27)
-//var s1 = datagood.first.trim.split(",")
+val datagood = datanoheader.filter(line => line.split(",").length == 27)
+
+//Array(tr, try, trm, trd, trh, trm, trs, td, sa, da, sp, dp, pr, flg, fwd, stos, ipkt, ibyt, opkt, obyt, in, out, sas, das, dtos, dir, ra)
 
 def add_time(row: Array[String]) = {
     val num_time = row(4).toDouble + row(5).toDouble/60 + row(6).toDouble/3600
@@ -77,7 +137,19 @@ def add_time(row: Array[String]) = {
 }
 
 val data_with_time = datagood.map(_.trim.split(",")).map(add_time)
-//s1 = add_time(s1)
+
+if (compute_quantiles == true){
+    println("calculating time cuts ...")
+    time_cuts = distributed_quantiles(quant, compute_ecdf(data_with_time.map(row => row(27).toDouble )))
+    println(time_cuts.mkString(",") )
+    println("calculating byte cuts ...")
+    ibyt_cuts = distributed_quantiles(quant, compute_ecdf(data_with_time.map(row => row(17).toDouble )))
+    println(ibyt_cuts.mkString(",") )
+    println("calculating pkt cuts")
+    ipkt_cuts = distributed_quantiles(quint, compute_ecdf(data_with_time.map(row => row(16).toDouble )))
+    println(ipkt_cuts.mkString(",") )
+}
+
 
 def bin_ibyt_ipkt_time(row: Array[String], 
                        ibyt_cuts: Array[Double], 
@@ -98,7 +170,7 @@ def bin_ibyt_ipkt_time(row: Array[String],
     for (cut <- time_cuts){
         if (time > cut) { time_bin = time_bin+1 }
     }
-    row.clone :+ ibyt_bin.toString :+ ipkt_bin.toString :+ time_bin.toString
+    row :+ ibyt_bin.toString :+ ipkt_bin.toString :+ time_bin.toString
 }
 
 //s1 = bin_ibyt_ipkt_time(row = s1, ibyt_cuts, ipkt_cuts, time_cuts)
@@ -145,146 +217,36 @@ def adjust_port(row: Array[String]) = {
     }else if (p_case == 4 & dport == 0){  src_word = "-1_"+src_word
     }else if (p_case == 4 & sport ==0){ dest_word = "-1_"+dest_word }
     
-    row.clone :+ word_port.toString :+ ip_pair :+ src_word.toString :+ dest_word.toString
+    row :+ word_port.toString :+ ip_pair :+ src_word.toString :+ dest_word.toString
 }
 
 //s1 = adjust_port(s1)
 val data_with_words = binned_data.map(row => adjust_port(row))
 
 
+val src_scored = data_with_words.map(row => {
+	val topic_mix_1 = topics.value.getOrElse(row(8),Array(0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05) ).asInstanceOf[Array[Double]]
+	val word_prob_1 = words.value.getOrElse(row(33),Array(0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05) ).asInstanceOf[Array[Double]]
+	val topic_mix_2 = topics.value.getOrElse(row(9),Array(0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05) ).asInstanceOf[Array[Double]]
+	val word_prob_2 = words.value.getOrElse(row(34),Array(0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05) ).asInstanceOf[Array[Double]]
+        var src_score = 0.0 
+        var dest_score = 0.0 
+	for ( i <- 0 to 19) {
+		 src_score += topic_mix_1(i) * word_prob_1(i)
+		 dest_score += topic_mix_2(i) * word_prob_2(i)
+      	}
+	 (min(src_score, dest_score), row :+ src_score :+ dest_score)
+	})
 
-val source = data_with_words.map(row => (row(8), row) )
-val dest = data_with_words.map(row => (row(9), row) )
-
-val topics_lines = sc.textFile(topic_mix_file)
-//print(topics_lines)
-val words_lines = sc.textFile(pword_file)
-//print(words_lines)
-
-
-val topics = topics_lines.map(line => {
-    val ip = line.split(",")(0)
-    val text = line.split(",")(1)
-    val text_no_quote = text.replaceAll("\"", "")
-    (ip, text_no_quote.split(" "))
-    })
-
-
-//topics.take(10)
-
-//this is an inner join, so we only get the ip's that were sources
-val src_top = source.join(topics)
-//src_top.take(10)
-
-val src_top_w = src_top.map( row => {
-    val data = row._2._1
-    val topic_mix = row._2._2
-    (data(33), (data, topic_mix))
-    })
-
-val words = words_lines.map(line => {
-    val word = line.split(",")(0)
-    val text = line.split(",")(1)
-    val text_no_quote = text.replaceAll("\"", "")
-    (word, text_no_quote.split(" "))
-    })
-
-/**
-val words = words_lines.map(line => {
-    val word = line.split("\"")(1).replaceAll(",", "_")
-    val letters = word.split("_")
-    val word_adj = {
-        var f : Array[String] = Array() 
-        for (letter <- letters){
-            if (letter != "-1"){f = f :+ letter + ".0"}
-        }
-        f.mkString("_")
-    }
-    val text = line.split("\"")(3)
-    (word_adj, text.split(" "))
-    })
-*/
-
-val src_top_word = src_top_w.join(words)
-
-
-
-def wtonum(n: String) = {
-    val splits = n.split("e")
-    if (splits.length < 2 & splits(0).contains("e") ) { "0"
-    }else if (splits.length < 2 & splits(0).toDouble < 1){splits(0)
-    }else if (splits.length < 2){"0"
-    }else if (splits.length == 2 & (splits(1) == "0" | splits(1) == "-" | splits(1) == "-0") ){"0"
-    }else splits(0)+"e"+splits(1)
-}
-
-
-val src_scored = src_top_word.map(row => {
-    val data = row._2._1._1
-    val topic_mix_orig = row._2._1._2
-    val topic_mix = topic_mix_orig.map(n => wtonum(n) )
-    val wordprob_orig = row._2._2
-    val wordprob = wordprob_orig.map(n => wtonum(n) )
-    val src_score = (topic_mix zip wordprob).map(elem => elem._1.toDouble*elem._2.toDouble).reduce(_+_)
-    (src_score, data :+ src_score.toString)
-    })
 
 //src_scored.take(10)
 
-//Now for destination:
-val dest_top = dest.join(topics)
 
-val dest_top_w = dest_top.map( row => {
-    val data = row._2._1
-    val topic_mix = row._2._2
-    (data(33), (data, topic_mix))
-    })
+var scored = src_scored.filter(elem => elem._1 < threshold).sortByKey().map( row => row._2.mkString(",") )
 
-val dest_top_word = dest_top_w.join(words)
-
-val dest_scored = dest_top_word.map(row => {
-    val data = row._2._1._1
-    val topic_mix_orig = row._2._1._2
-    val topic_mix = topic_mix_orig.map(n => wtonum(n) )
-    val wordprob_orig = row._2._2
-    val wordprob = wordprob_orig.map(n => wtonum(n) )
-    val dest_score = (topic_mix zip wordprob).map(elem => elem._1.toDouble*elem._2.toDouble).reduce(_+_)
-    (dest_score, data :+ dest_score.toString)
-    })
-
-
-//dest_scored.take(10)
-
-val scored = sc.union(src_scored, dest_scored).filter(elem => elem._1 < threshold).repartition(1).sortByKey().map( row => row._2.mkString(",") )
 scored.persist(StorageLevel.MEMORY_AND_DISK)
 scored.saveAsTextFile(scored_output_file)
 
-
-
-
-
-
-
-
-
-
-
-//words.take(10)
-
-//val topicsBroadcast = sc.broadcast(topics.collectAsMap())
-
-//val rdd1 = sc.parallelize(Seq((1, "A"), (2, "B"), (3, "C")))
-//val rdd2 = sc.parallelize(Seq(((1, "Z"), 111), ((1, "ZZ"), 111), ((2, "Y"), 222), ((3, "X"), 333)))
-/**
-val rdd1Broadcast = sc.broadcast(rdd1.collectAsMap())
-val joined = rdd2.mapPartitions({ iter =>
-  val m = rdd1Broadcast.value
-  for {
-    ((t, w), u) <- iter
-    if m.contains(t)
-  } yield ((t, w), (u, m.get(t).get))
-}, preservesPartitioning = true)
-*/
 
 System.exit(0)
 
