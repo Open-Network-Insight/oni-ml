@@ -330,3 +330,4 @@ scored.take(10).foreach(println)
 scored.persist(StorageLevel.MEMORY_AND_DISK)
 scored.saveAsTextFile(scored_output_file)
 
+System.exit(0)
