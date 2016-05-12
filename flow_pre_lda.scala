@@ -1,9 +1,15 @@
 val sqlContext = new org.apache.spark.sql.SQLContext(sc)
 import org.apache.spark.sql.types._
 import org.apache.spark.storage.StorageLevel
-import org.apache.spark.mllib.linalg.Vectors
+import org.apache.log4j.Logger
+import org.apache.log4j.Level
+import org.apache.spark.rdd.RDD
+import org.apache.spark.sql.types._
+import org.apache.spark.storage.StorageLevel
+import org.apache.spark.mllib.linalg._
 import breeze.stats.DescriptiveStats._
 import breeze.linalg._
+
 import org.apache.log4j.Logger
 import org.apache.log4j.Level
 
@@ -42,41 +48,50 @@ class SimpleCSVHeader(header:Array[String]) extends Serializable {
 }
 
 
-//0case class schema(time: String, 
-//1                  year: Double,
-//2                  month: Double,
-//3                  day: Double,
-//4                  hour: Double,
-//5                  minute: Double,
-//6                  second: Double,
-//7                  tdur: Double, 
-//8                  sip: String, 
-//9                  dip: String,
-//10                  sport: Double,
-//11                  dport: Double, 
-//12                  proto: String, 
-//13                  flag: String, 
-//14                  fwd: Double, 
-//15                  stos: Double,
-//16                  ipkt: Double, 
-//17                  ibyt: Double, 
-//18                  opkt: Double, 
-//19                  obyt: Double, 
-//20                  input: Double, 
-//21                  output: Double,
-//22                  sas: String, 
-//23                  das: Sring, 
-//24                  dtos: String, 
-//25                  dir: String,
-//26                  rip: String)
+
+val time_flow_index = 0
+val year_flow_index = 1
+val month_flow_index = 2
+val day_flow_index = 3
+val hour_flow_index = 4
+val minute_flow_index = 5
+val second_flow_index = 6
+val tdur_flow_index = 7
+val sip_flow_index = 8
+val dip_flow_index = 9
+val sport_flow_index = 10
+val dport_flow_index = 11
+val proto_flow_index = 12
+val flag_flow_index = 13
+val fwd_flow_index = 14
+val stos_flow_index = 15
+val ipkt_flow_index  = 16
+val ibyt_flow_index = 17
+val opkt_flow_index = 18
+val obyt_flow_index = 19
+val input_flow_index= 20
+val output_flow_index = 21
+val sas_flow_index = 22
+val das_flow_index = 23
+val dtos_flow_index = 24
+val dir_flow_index  = 25
+val rip_flow_index = 26
 
 //----------Inputs-------------
 //val file = "/user/history/hiveflow/netflow/year=2015/month=6/day=18/hour=0/*"
 val file = System.getenv("DPATH")
+
+
+val scoredFile = System.getenv("HPATH") + "/flow_scores.csv"
 //val output_file = "/user/history/hiveflow/netflow/word_counts_for_20150618"
 val output_file = System.getenv("HPATH") + "/word_counts"
 //val output_file_for_lda = "/user/history/hiveflow/netflow/lda_word_counts_for_20150618"
 val output_file_for_lda = System.getenv("HPATH") + "/lda_word_counts"
+
+println("scoredFile:  " + scoredFile)
+println("outputFile:  " + output_file)
+println("output_file_for_lda:  " + output_file_for_lda)
+
 val compute_quantiles : Boolean = true
 val quant = Array(0.1,0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9)
 val quint = Array(0, 0.2, 0.4, 0.6, 0.8)
@@ -94,36 +109,36 @@ def compute_ecdf(x : org.apache.spark.rdd.RDD[Double]) : org.apache.spark.rdd.RD
     val counts = x.map( v => (v,1)).reduceByKey(_+_).sortByKey().cache()
     // compute the partition sums
     val partSums: Array[Double] = 0.0 +: counts.mapPartitionsWithIndex {
-      case (index, partition) => Iterator(partition.map { case (sample, count) => count }.sum.toDouble)
+        case (index, partition) => Iterator(partition.map { case (sample, count) => count }.sum.toDouble)
     }.collect()
-    
+
     // get sample size
     val numValues = partSums.sum
-    
+
     // compute empirical cumulative distribution
     val sumsRdd = counts.mapPartitionsWithIndex {
-      case (index, partition) => {
-        var startValue = 0.0
-        for (i <- 0 to index) {
-          startValue += partSums(i)
+        case (index, partition) => {
+            var startValue = 0.0
+            for (i <- 0 to index) {
+                startValue += partSums(i)
+            }
+            partition.scanLeft((0.0, startValue))((prev, curr) => (curr._1, prev._2 + curr._2)).drop(1)
         }
-        partition.scanLeft((0.0, startValue))((prev, curr) => (curr._1, prev._2 + curr._2)).drop(1)
-      }
     }
     sumsRdd.map( elem => (elem._1, elem._2 / numValues))
 }
 
 def distributed_quantiles(quantiles: Array[Double], ecdf: org.apache.spark.rdd.RDD[(Double, Double)]): Array[Double] ={
-    def dqSeqOp(acc: Array[Double], value: (Double, Double) ) : Array[Double]= { 
+    def dqSeqOp(acc: Array[Double], value: (Double, Double) ) : Array[Double]= {
         var newacc: Array[Double] = acc
         for ( (quant, pos) <- quantiles.zipWithIndex) {
             newacc(pos) = if (value._2 < quant ) {max(newacc(pos), value._1)}else{newacc(pos)}
         }
         acc
     }
-    
+
     def dqCombOp(acc1: Array[Double], acc2: Array[Double]) = { (acc1 zip acc2).map(tuple => max(tuple._1, tuple._2)) }
-    
+
     ecdf.aggregate(Array.fill[Double](quantiles.length)(0)) ((acc, value) =>dqSeqOp(acc, value), (acc1, acc2)=>dqCombOp(acc1, acc2))
 }
 
@@ -134,18 +149,107 @@ def bin_column(value: String, cuts: Array[Double]) = {
 }
 
 
+def convert_feedback_row_to_flow_row(feedBackRow: Array[String]) = {
+    // when we
+    val sev_feedback_index = 0
+    val tstart_feedback_index = 1
+    val srcIP_feedback_index = 2
+    val dstIP_feedback_index = 3
+    val sport_feedback_index = 4
+    val dport_feedback_index = 5
+    val proto_feedback_index = 6
+    val flag_feedback_index = 7
+    val ipkt_feedback_index = 8
+    val ibyt_feedback_index = 9
+    val lda_score_feedback_index = 10
+    val rank_feedback_index = 11
+    val srcIpInternal_feedback_index = 12
+    val destIpInternal_feedback_index = 13
+    val srcGeo_feedback_index = 14
+    val dstGeo_feedback_index= 15
+    val srcDomain_feedback_index = 16
+    val dstDomain_feedback_index = 17
+    val gtiSrcRep_feedback_index = 18
+    val gtiDstRep_feedback_index = 19
+    val norseSrcRep_feedback_index = 20
+    val norseDstRep_feedback_index = 21
+
+    val srcIP : String = feedBackRow(srcIP_feedback_index)
+    val dstIP : String  = feedBackRow(dstIP_feedback_index)
+    val sport : String = feedBackRow(sport_feedback_index)
+    val dport : String = feedBackRow(dport_feedback_index)
+    val tstart : String = feedBackRow(tstart_feedback_index)
+    val ipkts : String = feedBackRow(ipkt_feedback_index)
+    val ibyts : String = feedBackRow(ibyt_feedback_index)
+
+
+    // it is assumed that the format of the time object coming from the feedback is
+    //                  YYYY-MM-DD HH:MM:SS
+    //   for example:   2016-04-21 03:58:13
+    val hourMinSecond : Array[String] = tstart.split(' ')(1).split(':')  // todo: error handling if the line is malformed
+    val hour = hourMinSecond(0)
+    val min  = hourMinSecond(1)
+    val sec = hourMinSecond(2)
+
+    val buf  = new StringBuilder
+    for (i <- 0 to 26) {
+        if ( i == hour_flow_index) {
+            buf ++= hour
+        } else if (i == minute_flow_index) {
+            buf ++= min
+        } else if (i == second_flow_index) {
+            buf ++= sec
+        } else if (i == ipkt_flow_index) {
+            buf ++= ipkts
+        } else if (i == ibyt_flow_index) {
+            buf ++= ibyts
+        } else if (i == sport_flow_index) {
+            buf ++= sport
+        } else if (i == dport_flow_index) {
+            buf ++= dport
+        } else if (i == sip_flow_index) {
+            buf ++= srcIP
+        } else if ( i == dip_flow_index) {
+            buf ++= dstIP
+        } else {
+            buf ++= " "
+        }
+        if (i < 26) {
+            buf + ','
+        }
+    }
+    buf.toString()
+}
 
 val rawdata = sc.textFile(file)
-
 val datanoheader = removeHeader(rawdata)
 val datagood = datanoheader.filter(line => line.split(",").length == 27)
+
+// test if the scored file exists
+val hadoopConf = sc.hadoopConfiguration
+val fs = org.apache.hadoop.fs.FileSystem.get(hadoopConf)
+val scoredFileExists = fs.exists(new org.apache.hadoop.fs.Path(scoredFile))
+
+
+
+val totalData = if (scoredFileExists) {
+    val scoreData : RDD[String] = sc.textFile(scoredFile).map(_.split(',')).map(convert_feedback_row_to_flow_row)
+    val duplicationFactor = 1000 // we should read this from a config file
+    val duplicatedScoreData = scoreData.flatMap(x=> List.fill(duplicationFactor)(x))
+    datagood.union(duplicatedScoreData)
+} else {
+    datagood
+}
+
+
+
 
 def add_time(row: Array[String]) = {
     val num_time = row(4).toDouble + row(5).toDouble/60 + row(6).toDouble/3600
     row.clone :+ num_time.toString
 }
 
-var data_with_time = datagood.map(_.trim.split(",")).map(add_time)
+val data_with_time = totalData.map(_.trim.split(",")).map(add_time)
 
 if (compute_quantiles == true){
     println("calculating time cuts ...")
@@ -159,8 +263,8 @@ if (compute_quantiles == true){
     println(ipkt_cuts.mkString(",") )
 }
 
-def bin_ibyt_ipkt_time(row: Array[String], 
-                       ibyt_cuts: Array[Double], 
+def bin_ibyt_ipkt_time(row: Array[String],
+                       ibyt_cuts: Array[Double],
                        ipkt_cuts: Array[Double],
                        time_cuts: Array[Double]) = {
     val time = row(27).toDouble
@@ -197,7 +301,7 @@ def adjust_port(row: Array[String]) = {
 
     var ip_pair = row(9) + " " + row(8)
     if (sip < dip & sip != 0) { ip_pair = row(8) + " " + row(9) }
-    
+
     if ((dport <= 1024 | sport<=1024) & (dport > 1024 | sport>1024) & min(dport,sport) != 0){
         p_case = 2
         word_port = min(dport, sport)
@@ -219,12 +323,12 @@ def adjust_port(row: Array[String]) = {
     val word = word_port.toString+"_"+time_bin.toString+"_"+ibyt_bin.toString+"_"+ipkt_bin.toString
     var src_word = word
     var dest_word = word
-    
+
     if (p_case == 2 & dport < sport){ dest_word = "-1_"+dest_word
     }else if (p_case == 2 & sport < dport){  src_word = "-1_"+src_word
     }else if (p_case == 4 & dport == 0){  src_word = "-1_"+src_word
     }else if (p_case == 4 & sport ==0){ dest_word = "-1_"+dest_word }
-    
+
     row.clone :+ word_port.toString :+ ip_pair :+ src_word.toString :+ dest_word.toString
 }
 
@@ -258,7 +362,7 @@ word_counts.saveAsTextFile(output_file)
 val result = word_counts.map( row => (row.split(",")(0), (row.split(",")(1), row.split(",")(2).toDouble.asInstanceOf[Long]))).aggregateByKey(Map[String,Long]())( (accum,value) => accum +(value._1 -> value._2), (accum1, accum2) => accum1 ++ accum2).map{ case (ip: String, wordMap: Map[String,Long]) => {
     val array = wordMap.toArray
     (ip, array)
-    }}
+}}
 
 val result2 = result.map( row =>{
     val ip = row._1
@@ -266,7 +370,7 @@ val result2 = result.map( row =>{
     val num_words = array.length
     val x = array.map(t => t._1.toString+":"+t._2.toString).mkString(",")
     ip +","+num_words+","+x
-    })
+})
 
 //result2.take(10)
 //result2.saveAsTextFile(output_file_for_lda)
