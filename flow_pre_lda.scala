@@ -1,20 +1,16 @@
 val sqlContext = new org.apache.spark.sql.SQLContext(sc)
 import org.apache.spark.sql.types._
 import org.apache.spark.storage.StorageLevel
-import org.apache.log4j.Logger
-import org.apache.log4j.Level
-import org.apache.spark.rdd.RDD
-import org.apache.spark.sql.types._
+import org.apache.log4j.{Level, Logger, _}
 import org.apache.spark.storage.StorageLevel
 import org.apache.spark.mllib.linalg._
-import breeze.stats.DescriptiveStats._
-import breeze.linalg._
-
-import org.apache.log4j.Logger
-import org.apache.log4j.Level
-
+import org.apache.spark.rdd.RDD
 Logger.getLogger("org").setLevel(Level.OFF)
 Logger.getLogger("akka").setLevel(Level.OFF)
+import org.apache.spark.mllib.linalg.Vectors
+import breeze.stats.DescriptiveStats._
+import breeze.linalg._
+import scala.io.Source
 
 def isNumeric(input: String): Boolean = {
     if (input == "") {false}
@@ -43,50 +39,47 @@ def print(input: org.apache.spark.rdd.RDD[String]) = input.take(10).foreach(prin
 // Load and parse the data
 
 class SimpleCSVHeader(header:Array[String]) extends Serializable {
-  val index = header.zipWithIndex.toMap
-  def apply(array:Array[String], key:String):String = array(index(key))
+    val index = header.zipWithIndex.toMap
+    def apply(array:Array[String], key:String):String = array(index(key))
 }
 
-
-
-val time_flow_index = 0
-val year_flow_index = 1
-val month_flow_index = 2
-val day_flow_index = 3
-val hour_flow_index = 4
-val minute_flow_index = 5
-val second_flow_index = 6
-val tdur_flow_index = 7
-val sip_flow_index = 8
-val dip_flow_index = 9
-val sport_flow_index = 10
-val dport_flow_index = 11
-val proto_flow_index = 12
-val flag_flow_index = 13
-val fwd_flow_index = 14
-val stos_flow_index = 15
-val ipkt_flow_index  = 16
-val ibyt_flow_index = 17
-val opkt_flow_index = 18
-val obyt_flow_index = 19
-val input_flow_index= 20
-val output_flow_index = 21
-val sas_flow_index = 22
-val das_flow_index = 23
-val dtos_flow_index = 24
-val dir_flow_index  = 25
-val rip_flow_index = 26
+//0case class schema(time: String,
+//1 year: Double,
+//2 month: Double,
+//3 day: Double,
+//4 hour: Double,
+//5 minute: Double,
+//6 second: Double,
+//7 tdur: Double,
+//8 sip: String,
+//9 dip: String,
+//10 sport: Double,
+//11 dport: Double,
+//12 proto: String,
+//13 flag: String,
+//14 fwd: Double,
+//15 stos: Double,
+//16 ipkt: Double,
+//17 ibyt: Double,
+//18 opkt: Double,
+//19 obyt: Double,
+//20 input: Double,
+//21 output: Double,
+//22 sas: String,
+//23 das: Sring,
+//24 dtos: String,
+//25 dir: String,
+//26 rip: String)
 
 //----------Inputs-------------
 //val file = "/user/history/hiveflow/netflow/year=2015/month=6/day=18/hour=0/*"
+
+
 val file = System.getenv("DPATH")
-
-
-val scoredFile = System.getenv("HPATH") + "/flow_scores.csv"
-//val output_file = "/user/history/hiveflow/netflow/word_counts_for_20150618"
+val scoredFile = System.getenv("LPATH") + "/flow_scores.csv"
 val output_file = System.getenv("HPATH") + "/word_counts"
-//val output_file_for_lda = "/user/history/hiveflow/netflow/lda_word_counts_for_20150618"
 val output_file_for_lda = System.getenv("HPATH") + "/lda_word_counts"
+
 
 println("scoredFile:  " + scoredFile)
 println("outputFile:  " + output_file)
@@ -149,7 +142,9 @@ def bin_column(value: String, cuts: Array[Double]) = {
 }
 
 
-def convert_feedback_row_to_flow_row(feedBackRow: Array[String]) = {
+def convert_feedback_row_to_flow_row(feedBackRow: String) = {
+
+    val row = feedBackRow.split(',')
     // when we
     val sev_feedback_index = 0
     val tstart_feedback_index = 1
@@ -174,13 +169,13 @@ def convert_feedback_row_to_flow_row(feedBackRow: Array[String]) = {
     val norseSrcRep_feedback_index = 20
     val norseDstRep_feedback_index = 21
 
-    val srcIP : String = feedBackRow(srcIP_feedback_index)
-    val dstIP : String  = feedBackRow(dstIP_feedback_index)
-    val sport : String = feedBackRow(sport_feedback_index)
-    val dport : String = feedBackRow(dport_feedback_index)
-    val tstart : String = feedBackRow(tstart_feedback_index)
-    val ipkts : String = feedBackRow(ipkt_feedback_index)
-    val ibyts : String = feedBackRow(ibyt_feedback_index)
+    val srcIP : String = row(srcIP_feedback_index)
+    val dstIP : String  = row(dstIP_feedback_index)
+    val sport : String = row(sport_feedback_index)
+    val dport : String = row(dport_feedback_index)
+    val tstart : String = row(tstart_feedback_index)
+    val ipkts : String = row(ipkt_feedback_index)
+    val ibyts : String = row(ibyt_feedback_index)
 
 
     // it is assumed that the format of the time object coming from the feedback is
@@ -190,6 +185,36 @@ def convert_feedback_row_to_flow_row(feedBackRow: Array[String]) = {
     val hour = hourMinSecond(0)
     val min  = hourMinSecond(1)
     val sec = hourMinSecond(2)
+
+
+    val time_flow_index = 0
+    val year_flow_index = 1
+    val month_flow_index = 2
+    val day_flow_index = 3
+    val hour_flow_index = 4
+    val minute_flow_index = 5
+    val second_flow_index = 6
+    val tdur_flow_index = 7
+    val sip_flow_index = 8
+    val dip_flow_index = 9
+    val sport_flow_index = 10
+    val dport_flow_index = 11
+    val proto_flow_index = 12
+    val flag_flow_index = 13
+    val fwd_flow_index = 14
+    val stos_flow_index = 15
+    val ipkt_flow_index  = 16
+    val ibyt_flow_index = 17
+    val opkt_flow_index = 18
+    val obyt_flow_index = 19
+    val input_flow_index= 20
+    val output_flow_index = 21
+    val sas_flow_index = 22
+    val das_flow_index = 23
+    val dtos_flow_index = 24
+    val dir_flow_index  = 25
+    val rip_flow_index = 26
+
 
     val buf  = new StringBuilder
     for (i <- 0 to 26) {
@@ -212,7 +237,7 @@ def convert_feedback_row_to_flow_row(feedBackRow: Array[String]) = {
         } else if ( i == dip_flow_index) {
             buf ++= dstIP
         } else {
-            buf ++= " "
+            buf ++= "##"
         }
         if (i < 26) {
             buf + ','
@@ -220,36 +245,36 @@ def convert_feedback_row_to_flow_row(feedBackRow: Array[String]) = {
     }
     buf.toString()
 }
-
-val rawdata = sc.textFile(file)
-val datanoheader = removeHeader(rawdata)
-val datagood = datanoheader.filter(line => line.split(",").length == 27)
-
-// test if the scored file exists
-val hadoopConf = sc.hadoopConfiguration
-val fs = org.apache.hadoop.fs.FileSystem.get(hadoopConf)
-val scoredFileExists = fs.exists(new org.apache.hadoop.fs.Path(scoredFile))
+val rawdata : RDD[String] = sc.textFile(file)
+val datanoheader : RDD[String] = removeHeader(rawdata)
 
 
+val scoredFileExists = new java.io.File(scoredFile).exists
 
-val totalData = if (scoredFileExists) {
-    val scoreData : RDD[String] = sc.textFile(scoredFile).map(_.split(',')).map(convert_feedback_row_to_flow_row)
-    val duplicationFactor = 1000 // we should read this from a config file
-    val duplicatedScoreData = scoreData.flatMap(x=> List.fill(duplicationFactor)(x))
-    datagood.union(duplicatedScoreData)
+val scoredData : Array[String] = if (scoredFileExists) {
+    val duplicationFactor = System.getenv("DUPFACTOR").toInt
+
+    val nonThreateningRows = Source.fromFile(scoredFile).getLines().toArray.drop(1).filter(l=>(l.split(',')(0).toInt == 3))
+    println("User feedback read from: " + scoredFile + ". "
+      + nonThreateningRows.length + " many connections flagged nonthreatening.")
+    println("Duplification factor: " + duplicationFactor)
+    nonThreateningRows.map(convert_feedback_row_to_flow_row(_)).flatMap(List.fill(duplicationFactor)(_))
 } else {
-    datagood
+    Array[String]()
 }
 
 
+val totalData : RDD[String] = datanoheader.union(sc.parallelize(scoredData))
 
+val datagood : RDD[String] = totalData.filter(line => line.split(",").length == 27)
 
-def add_time(row: Array[String]) = {
+def add_time(row: Array[String]) : Array[String] = {
     val num_time = row(4).toDouble + row(5).toDouble/60 + row(6).toDouble/3600
     row.clone :+ num_time.toString
 }
 
-val data_with_time = totalData.map(_.trim.split(",")).map(add_time)
+var data_with_time = datagood.map(_.trim.split(',')).map(add_time)
+
 
 if (compute_quantiles == true){
     println("calculating time cuts ...")

@@ -20,6 +20,7 @@ source /etc/duxbay.conf
 export DPATH
 export HPATH
 export LUSER
+export LPATH
 export TOL
 export KRB_AUTH
 
@@ -29,13 +30,15 @@ hadoop fs -rm -R ${HPATH}/lda_word_counts
 #CUT=$(<${DSOURCE}_qtiles)
 #export CUT
 
+# move TDM to local file system
+# do we have to do a mkdir here?
+mkdir -p ${LPATH}
+rm -f ${LPATH}/*.{dat, beta, other, pkl} # protect the flow_scores.csv file
+
 #kinit -kt /etc/security/keytabs/smokeuser.headless.keytab <user-id>
 time spark-shell --master yarn-client --executor-memory  ${SPK_EXEC_MEM}  --driver-memory 2g --num-executors ${SPK_EXEC} --executor-cores 1 --conf spark.shuffle.io.preferDirectBufs=false --conf shuffle.service.enabled=true --conf spark.driver.maxResultSize="2g"  -i scala ${DSOURCE}_pre_lda.scala
 
-# move TDM to local file system
-# do we have to do a mkdir here?
-rm -rf ${LPATH}
-mkdir ${LPATH}
+
 
 hadoop fs -copyToLocal  ${HPATH}/word_counts/part-* ${LPATH}/.
 cd ${LPATH}
