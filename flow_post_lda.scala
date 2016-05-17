@@ -53,7 +53,7 @@ val scored_output_file = System.getenv("HPATH") + "/scored"
 val threshold : Double = System.getenv("TOL").toDouble
 
 val compute_quantiles : Boolean = true
-val quant = Array(0.1,0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9)
+val quant = Array(0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9)
 val quint = Array(0, 0.2, 0.4, 0.6, 0.8)
 var ibyt_cuts = new Array[Double](10)
 var ipkt_cuts = new Array[Double](5)
