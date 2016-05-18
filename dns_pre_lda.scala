@@ -57,7 +57,7 @@ def isNumeric(input: String): Boolean = {
 def toDouble(s: String, default:Double=Double.NaN) = {if (isNumeric(s)) s.toDouble else default}
 
 
-val file_list = System.getenv("DPATH")
+val file_list = System.getenv("DNS_PATH")
 val feedback_file = "None"
 val duplication_factor = 100
 val outputfile = System.getenv("HPATH")  + "/word_counts"
