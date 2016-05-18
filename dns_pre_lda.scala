@@ -90,11 +90,11 @@ val output_file_for_lda = System.getenv("HPATH") + "/dns_lda_word_counts"
 //-----------------------------
 
 var multidata = {
-    var df = sqlContext.parquetFile( file_list.split(",")(0) ).filter("frame_len is not null")
+    var df = sqlContext.parquetFile( file_list.split(",")(0) ).filter("frame_len is not null and unix_tstamp is not null")
     val files = file_list.split(",")
     for ( (file, index) <- files.zipWithIndex){
         if (index > 1) {
-	    df = df.unionAll(sqlContext.parquetFile(file).filter("frame_len is not null"))
+	    df = df.unionAll(sqlContext.parquetFile(file).filter("frame_len is not null and unix_tstamp is not null"))
 	}
     }
     df =  df.select("frame_time","unix_tstamp","frame_len", "ip_dst", "dns_qry_name", "dns_qry_class", "dns_qry_type", "dns_qry_rcode")
