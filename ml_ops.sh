@@ -17,7 +17,7 @@ export DUPFACTOR
 #  pre-processing scala
 
 source /etc/duxbay.conf
-export DPATH
+export FLOWPATH
 export HPATH
 export LUSER
 export TOL
@@ -68,7 +68,7 @@ time python lda_post.py ${LPATH}/
 
 # post-processing stage
 source /etc/duxbay.conf
-export DPATH
+export FLOWPATH
 export HPATH
 export TOL
 hadoop fs -rm ${HPATH}/doc_results.csv

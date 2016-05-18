@@ -46,7 +46,7 @@ class SimpleCSVHeader(header:Array[String]) extends Serializable {
 
 
 //----------Inputs-------------
-val file = System.getenv("DPATH")
+val file = System.getenv("FLOWPATH")
 val topic_mix_file = System.getenv("HPATH") + "/doc_results.csv"
 val pword_file = System.getenv("HPATH")+"/word_results.csv"
 val scored_output_file = System.getenv("HPATH") + "/scored"

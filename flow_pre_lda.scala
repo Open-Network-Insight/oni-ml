@@ -72,7 +72,7 @@ class SimpleCSVHeader(header:Array[String]) extends Serializable {
 
 //----------Inputs-------------
 //val file = "/user/history/hiveflow/netflow/year=2015/month=6/day=18/hour=0/*"
-val file = System.getenv("DPATH")
+val file = System.getenv("FLOWPATH")
 //val output_file = "/user/history/hiveflow/netflow/word_counts_for_20150618"
 val output_file = System.getenv("HPATH") + "/word_counts"
 //val output_file_for_lda = "/user/history/hiveflow/netflow/lda_word_counts_for_20150618"
