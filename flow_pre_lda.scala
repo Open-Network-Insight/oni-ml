@@ -254,11 +254,11 @@ val scoredFileExists = new java.io.File(scoredFile).exists
 val scoredData : Array[String] = if (scoredFileExists) {
     val duplicationFactor = System.getenv("DUPFACTOR").toInt
 
-    val nonThreateningRows = Source.fromFile(scoredFile).getLines().toArray.drop(1).filter(l=>(l.split(',')(0).toInt == 3))
+    val rowsToDuplicate = Source.fromFile(scoredFile).getLines().toArray.drop(1).filter(l=>(l.split(',')(0).toInt == 3))
     println("User feedback read from: " + scoredFile + ". "
-      + nonThreateningRows.length + " many connections flagged nonthreatening.")
-    println("Duplification factor: " + duplicationFactor)
-    nonThreateningRows.map(convert_feedback_row_to_flow_row(_)).flatMap(List.fill(duplicationFactor)(_))
+      + rowsToDuplicate.length + " many connections flagged nonthreatening.")
+    println("Duplication factor: " + duplicationFactor)
+    rowsToDuplicate.map(convert_feedback_row_to_flow_row(_)).flatMap(List.fill(duplicationFactor)(_))
 } else {
     Array[String]()
 }
