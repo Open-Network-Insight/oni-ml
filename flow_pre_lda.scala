@@ -255,7 +255,7 @@ val scoredFileExists = new java.io.File(scoredFile).exists
 val scoredData : Array[String] = if (scoredFileExists) {
     val duplicationFactor = System.getenv("DUPFACTOR").toInt
 
-    val rowsToDuplicate = Source.fromFile(scoredFile).getLines().toArray.drop(1).filter(l=>(l.split(',')(0).toInt == 3))
+    val rowsToDuplicate = Source.fromFile(scoredFile).getLines().toArray.drop(1).filter(l => (l.split(',').length==22) && l.split(',')(0).toInt == 3)
     println("User feedback read from: " + scoredFile + ". "
       + rowsToDuplicate.length + " many connections flagged nonthreatening.")
     println("Duplication factor: " + duplicationFactor)
