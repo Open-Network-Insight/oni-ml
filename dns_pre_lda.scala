@@ -59,7 +59,7 @@ def toDouble(s: String, default:Double=Double.NaN) = {if (isNumeric(s)) s.toDoub
 
 
 val file_list = System.getenv("DNS_PATH")
-val feedback_file = System.getenv("HPATH") + "/dns_scores.csv"
+val feedback_file = System.getenv("LPATH") + "/dns_scores.csv"
 val duplication_factor = 100
 val outputfile = System.getenv("HPATH")  + "/word_counts"
 val quant = Array(0, 0.1,0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9)
