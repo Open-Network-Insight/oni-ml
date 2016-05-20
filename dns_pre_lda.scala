@@ -5,6 +5,7 @@ val sqlContext = new org.apache.spark.sql.SQLContext(sc)
 import org.apache.spark.sql.types._
 import org.apache.spark.storage.StorageLevel
 import org.apache.spark.mllib.linalg.Vectors
+import sqlContext.implicits._
 import breeze.stats.DescriptiveStats._
 //import breeze.linalg._
 import org.apache.log4j.Logger
@@ -58,7 +59,7 @@ def toDouble(s: String, default:Double=Double.NaN) = {if (isNumeric(s)) s.toDoub
 
 
 val file_list = System.getenv("DNS_PATH")
-val feedback_file = "None"
+val feedback_file = System.getenv("HPATH") + "/dns_scores.csv"
 val duplication_factor = 100
 val outputfile = System.getenv("HPATH")  + "/word_counts"
 val quant = Array(0, 0.1,0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9)
@@ -89,6 +90,72 @@ val output_file_for_lda = System.getenv("HPATH") + "/dns_lda_word_counts"
 
 //-----------------------------
 
+var falsepositives = {    
+    /* dns_scores.csv - feedback file structure
+    
+    0   frame_time             object
+    1   frame_len              object
+    2   ip_dst                 object
+    3   dns_qry_name           object
+    4   dns_qry_class           int64
+    5   dns_qry_type            int64
+    6   dns_qry_rcode           int64
+    7   domain                 object
+    8   subdomain              object
+    9   subdomain_length        int64
+    10  num_periods             int64
+    11  subdomain_entropy     float64
+    12  top_domain              int64
+    13  word                   object
+    14  score                 float64
+    15  query_rep              object
+    16  hh                      int64
+    17  ip_sev                  int64
+    18  dns_sev                 int64
+    19  dns_qry_class_name     object
+    20  dns_qry_type_name      object
+    21  dns_qry_rcode_name     object
+    22  network_context       float64
+    23  unix_tstamp             
+    */
+    
+    val FrameTimeIndex = 0
+    val UnixTstampIndex = 23
+    val FrameLenIndex = 1
+    val IpDstIndex = 2
+    val DnsQryNameIndex = 3
+    val DnsQryClassIndex = 4
+    val DnsQryTypeIndex = 5
+    val DnsQryRcodeIndex = 6
+    val DnsSevIndex = 18
+    
+    case class Feedback(frame_time: String, 
+                        unix_tstamp: String, 
+                        frame_len: Int, 
+                        ip_dst: String, 
+                        dns_qry_name: String, 
+                        dns_qry_class: String, 
+                        dns_qry_type: String, 
+                        dns_qry_rcode: String, 
+                        dns_sev: Int)
+    
+    val feedback :org.apache.spark.rdd.RDD[String] = sc.textFile(feedback_file)
+    val header = feedback.first()
+    val feedback_no_header = feedback.filter(line => !(line == header))
+    val feedback_df = feedback_no_header.map(_.split(",")).map(row => Feedback(row(FrameTimeIndex), 
+                                                                               row(UnixTstampIndex), 
+                                                                               row(FrameLenIndex).trim.toInt, 
+                                                                               row(IpDstIndex), 
+                                                                               row(DnsQryNameIndex), 
+                                                                               row(DnsQryClassIndex), 
+                                                                               row(DnsQryTypeIndex), 
+                                                                               row(DnsQryRcodeIndex), 
+                                                                               row(DnsSevIndex).trim.toInt )).toDF()
+    val result = feedback_df.filter("dns_sev = 3").select("frame_time","unix_tstamp","frame_len", "ip_dst", "dns_qry_name", "dns_qry_class", "dns_qry_type", "dns_qry_rcode")
+    
+    result.map(_.mkString(","))
+}
+
 var multidata = {
     var df = sqlContext.parquetFile( file_list.split(",")(0) ).filter("frame_len is not null and unix_tstamp is not null")
     val files = file_list.split(",")
@@ -107,22 +174,12 @@ var rawdata :org.apache.spark.rdd.RDD[String] = {
     if (feedback_file == "None") { multidata
     }else {
         var data :org.apache.spark.rdd.RDD[String] = multidata
-        val feedback :org.apache.spark.rdd.RDD[String] = sc.textFile(feedback_file)
-        val falsepositives = feedback.filter(line => line.split(",").last == "3")
-        var i = 1
-        while (i < duplication_factor) {
-            data = data.union(falsepositives)
-            i = i+1
-        }
-    data        
+        val = duplicatedScoreData = falsepositives.flatMap(x=> List.fill(duplication_factor)(x))
+        data = data.union(duplicatedScoreData)
+        data        
     }
 }
 
-// only needed if the schema is different than the standard solution setup
-//val indices: Array[Int] = Array(0,1,2,3,4,5,6,7,8)
-//rawdata = rawdata.map(line => line.split(",")).map(inner => indices.map(inner).mkString(","))
-
-//print_lines(rawdata)
 println(rawdata.count())
 var col = get_column_names(df_cols)
 
