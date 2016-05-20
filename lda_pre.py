@@ -30,10 +30,9 @@ durable = False
 if word_dict:
 	with open(tdmfile, 'r') as csvfile:
 		rowct = 1
-		w_idx = 1
+		w_idx = 0
 		wcdict = {}
 		readr = csv.reader(csvfile, delimiter=',', quotechar='"')
-		next(readr) #is there a header?
 		with open(wfile, 'w') as f:
 			for row in readr:
 				if row[1] not in wcdict:
@@ -63,7 +62,6 @@ if doc_line:
 		docdict = {}
 		with open(tdmfile, 'r') as csvfile:
 			readr = csv.reader(csvfile, delimiter=',', quotechar='"')
-			next(readr)		
 			for row in readr:
 				if row[0] in docdict:
 					docdict[row[0]][1] += 1
