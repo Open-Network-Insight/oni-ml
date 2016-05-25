@@ -79,18 +79,18 @@ val l_top_domains = Source.fromFile("top-1m.csv").getLines.map(line => {
                     }).toSet
 val top_domains = sc.broadcast(l_top_domains)
 
-/**
-val file_list = System.getenv("DPATH")    //This can be one file or many file pathes separated by commas
-val domain_table = System.getenv("DOMAIN_TABLE")
-val feedback_file = System.getenv("FPATH")
-val duplication_factor = System.getenv("DUPFACTOR").toInt
-val output_file = System.getenv("HPATH") + "/dns_word_counts"
-val output_file_for_lda = System.getenv("HPATH") + "/dns_lda_word_counts"
-*/
+case class Feedback(frame_time: String,
+                        unix_tstamp: String,
+                        frame_len: Int,
+                        ip_dst: String,
+                        dns_qry_name: String,
+                        dns_qry_class: String,
+                        dns_qry_type: String,
+                        dns_qry_rcode: String,
+                        dns_sev: Int)
+val scoredFileExists = new java.io.File(feedback_file).exists
 
-//-----------------------------
-
-var falsepositives = {    
+var falsepositives : org.apache.spark.rdd.RDD[String]  = if (scoredFileExists){
     /* dns_scores.csv - feedback file structure
     
     0   frame_time             object
@@ -117,8 +117,7 @@ var falsepositives = {
     21  dns_qry_rcode_name     object
     22  network_context       float64
     23  unix_tstamp             
-    */
-    
+    */    
     val FrameTimeIndex = 0
     val UnixTstampIndex = 23
     val FrameLenIndex = 1
@@ -129,31 +128,22 @@ var falsepositives = {
     val DnsQryRcodeIndex = 6
     val DnsSevIndex = 18
     
-    case class Feedback(frame_time: String, 
-                        unix_tstamp: String, 
-                        frame_len: Int, 
-                        ip_dst: String, 
-                        dns_qry_name: String, 
-                        dns_qry_class: String, 
-                        dns_qry_type: String, 
-                        dns_qry_rcode: String, 
-                        dns_sev: Int)
-    
-    val feedback :org.apache.spark.rdd.RDD[String] = sc.textFile(feedback_file)
-    val header = feedback.first()
-    val feedback_no_header = feedback.filter(line => !(line == header))
-    val feedback_df = feedback_no_header.map(_.split(",")).map(row => Feedback(row(FrameTimeIndex), 
-                                                                               row(UnixTstampIndex), 
-                                                                               row(FrameLenIndex).trim.toInt, 
-                                                                               row(IpDstIndex), 
-                                                                               row(DnsQryNameIndex), 
-                                                                               row(DnsQryClassIndex), 
-                                                                               row(DnsQryTypeIndex), 
-                                                                               row(DnsQryRcodeIndex), 
+    val lines = Source.fromFile(feedback_file).getLines().toArray().drop(1)
+    val feedback : org.apache.spark.rdd.RDD[String] = sc.parallelize(lines)
+    val feedback_df = feedback.map(_.split(",")).map(row => Feedback(row(FrameTimeIndex),
+                                                                               row(UnixTstampIndex),
+                                                                               row(FrameLenIndex).trim.toInt,
+                                                                               row(IpDstIndex),
+                                                                               row(DnsQryNameIndex),
+                                                                               row(DnsQryClassIndex),
+                                                                               row(DnsQryTypeIndex),
+                                                                               row(DnsQryRcodeIndex),
                                                                                row(DnsSevIndex).trim.toInt )).toDF()
-    val result = feedback_df.filter("dns_sev = 3").select("frame_time","unix_tstamp","frame_len", "ip_dst", "dns_qry_name", "dns_qry_class", "dns_qry_type", "dns_qry_rcode")
-    
-    result.map(_.mkString(","))
+    val result = feedback_df.filter("dns_sev = 3").select("frame_time","unix_tstamp","frame_len", "ip_dst", "dns_qry_name", "dns_qry_class", "dns_qry_type", "dns_qry_rcode").map(_.mkString(","))
+    val toDuplicate : org.apache.spark.rdd.RDD[String] = result.flatMap(x => List.fill(duplication_factor)(x))
+    toDuplicate
+} else{
+        null
 }
 
 var multidata = {
@@ -161,24 +151,24 @@ var multidata = {
     val files = file_list.split(",")
     for ( (file, index) <- files.zipWithIndex){
         if (index > 1) {
-	    df = df.unionAll(sqlContext.parquetFile(file).filter("frame_len is not null and unix_tstamp is not null"))
-	}
+            df = df.unionAll(sqlContext.parquetFile(file).filter("frame_len is not null and unix_tstamp is not null"))
+        }
     }
     df =  df.select("frame_time","unix_tstamp","frame_len", "ip_dst", "dns_qry_name", "dns_qry_class", "dns_qry_type", "dns_qry_rcode")
     df_cols = df.columns
-    val tempRDD: org.apache.spark.rdd.RDD[String] = df.map(_.mkString(",")) 
+    val tempRDD: org.apache.spark.rdd.RDD[String] = df.map(_.mkString(","))
     tempRDD
 }
 
 var rawdata :org.apache.spark.rdd.RDD[String] = {
-    if (feedback_file == "None") { multidata
+    if (!scoredFileExists) { multidata
     }else {
         var data :org.apache.spark.rdd.RDD[String] = multidata
-        val = duplicatedScoreData = falsepositives.flatMap(x=> List.fill(duplication_factor)(x))
-        data = data.union(duplicatedScoreData)
-        data        
+        data = data.union(falsepositives)
+        data
     }
 }
+
 
 println(rawdata.count())
 var col = get_column_names(df_cols)
