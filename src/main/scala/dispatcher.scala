@@ -9,9 +9,9 @@ class dispatcher {
       val f = args(1)
 
       f match {
-        case "dns_post" => println("dns_post")
-        case "dns_pre" => println("dns_pre")
-        case "flow_post" => println("flow_post")
+        case "dns_post" => dns_post_lda.run()
+        case "dns_pre" => dns_pre_lda.run()
+        case "flow_post" =>flow_post_lda.run()
         case "flow_pre" => flow_pre_lda.run()
       }
 

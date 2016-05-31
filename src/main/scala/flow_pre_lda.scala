@@ -9,8 +9,6 @@ import org.apache.spark.{SparkConf, SparkContext}
 import org.apache.spark.storage.StorageLevel
 import org.apache.spark.mllib.linalg._
 import org.apache.spark.rdd.RDD
-Logger.getLogger("org").setLevel(Level.OFF)
-Logger.getLogger("akka").setLevel(Level.OFF)
 import org.apache.spark.mllib.linalg.Vectors
 import breeze.stats.DescriptiveStats._
 import breeze.linalg._
@@ -20,6 +18,8 @@ import scala.io.Source
 object flow_pre_lda {
 
 def run() = {
+    Logger.getLogger("org").setLevel(Level.OFF)
+    Logger.getLogger("akka").setLevel(Level.OFF)
 
     val conf = new SparkConf().setAppName("ONI ML: flow pre lda")
     val sc = new SparkContext(conf)
