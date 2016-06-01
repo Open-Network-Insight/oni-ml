@@ -8,6 +8,14 @@ YR=${FDATE:0:4}
 MH=${FDATE:4:2}
 DY=${FDATE:6:2}
 
+# checking for required arguments
+if [[ "${#FDATE}" != "8" || -z "${DSOURCE}" ]]; then
+    echo "ml_ops.sh syntax error"
+    echo "Please run ml_ops.sh again with the correct syntax:"
+    echo "./ml_ops.sh 19700101 flow"
+    exit
+fi
+
 # intermediate ML results go in hive directory
 DFOLDER='hive'
 DUPFACTOR=1000
