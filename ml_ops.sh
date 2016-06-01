@@ -12,6 +12,10 @@ TOL=$6
 # number of total processes for mpi
 PROCESS_COUNT=20
 
+##do not edit##
+TOPIC_COUNT=20
+###############
+
 # intermediate ML results go in hive directory
 DFOLDER='hive'
 DUPFACTOR=1000
@@ -63,7 +67,7 @@ do
 done
 sleep 2
 cd ${LDAPATH}
-time mpiexec -n ${PROCESS_COUNT} -f machinefile ./lda est 2.5 20 settings.txt ${PROCESS_COUNT} ../${FDATE}/model.dat random ../${FDATE}
+time mpiexec -n ${PROCESS_COUNT} -f machinefile ./lda est 2.5 ${TOPIC_COUNT} settings.txt ${PROCESS_COUNT} ../${FDATE}/model.dat random ../${FDATE}
 sleep 10
 
 cd ${LUSER}/ml
