@@ -6,6 +6,7 @@ import org.apache.spark.sql.types._
 import org.apache.spark.storage.StorageLevel
 import org.apache.log4j.{Level, Logger, _}
 import org.apache.spark.{SparkConf, SparkContext}
+import org.apache.spark.SparkContext._
 import org.apache.spark.storage.StorageLevel
 import org.apache.spark.mllib.linalg._
 import org.apache.spark.rdd.RDD
@@ -122,7 +123,7 @@ def run() = {
 
     //-----------------------------
 
-    def compute_ecdf(x: org.apache.spark.rdd.RDD[Double]): org.apache.spark.rdd.RDD[(Double, Double)] = {
+    def compute_ecdf(x: RDD[Double]): RDD[(Double, Double)] = {
         val counts = x.map(v => (v, 1)).reduceByKey(_ + _).sortByKey().cache()
         // compute the partition sums
         val partSums: Array[Double] = 0.0 +: counts.mapPartitionsWithIndex {
@@ -145,7 +146,7 @@ def run() = {
         sumsRdd.map(elem => (elem._1, elem._2 / numValues))
     }
 
-    def distributed_quantiles(quantiles: Array[Double], ecdf: org.apache.spark.rdd.RDD[(Double, Double)]): Array[Double] = {
+    def distributed_quantiles(quantiles: Array[Double], ecdf: RDD[(Double, Double)]): Array[Double] = {
         def dqSeqOp(acc: Array[Double], value: (Double, Double)): Array[Double] = {
             var newacc: Array[Double] = acc
             for ((quant, pos) <- quantiles.zipWithIndex) {
@@ -280,6 +281,7 @@ def run() = {
         buf.toString()
     }
 
+    println("Trying to read file:  " + file)
     val rawdata: RDD[String] = sc.textFile(file)
     val datanoheader: RDD[String] = removeHeader(rawdata)
 

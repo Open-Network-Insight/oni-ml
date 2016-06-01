@@ -6,6 +6,7 @@ import org.apache.spark.mllib.linalg.Vectors
 import org.apache.log4j.Logger
 import org.apache.log4j.Level
 import org.apache.spark.{SparkConf, SparkContext}
+import org.apache.spark.SparkContext._
 import breeze.stats.DescriptiveStats._
 import breeze.linalg._
 
