@@ -1,13 +1,23 @@
 #!/bin/bash
 
 # read in variables (except for date) from etc/.conf file
-
 FDATE=$1
-YR=$2
-MH=$3
-DY=$4
-DSOURCE=$5
-TOL=$6
+DSOURCE=$2
+TOL=$3
+YR=${FDATE:0:4}
+MH=${FDATE:4:2}
+DY=${FDATE:6:2}
+
+# checking for required arguments
+if [[ "${#FDATE}" != "8" || -z "${DSOURCE}" ]]; then
+    echo "ml_ops.sh syntax error"
+    echo "Please run ml_ops.sh again with the correct syntax:"
+    echo "./ml_ops.sh YYYYMMDD TYPE [TOL]"
+    echo "for example:"
+    echo "./ml_ops.sh 20160122 dns 1e-6"
+    echo "./ml_ops.sh 20160122 flow"
+    exit
+fi
 
 # number of total processes for mpi
 PROCESS_COUNT=20
