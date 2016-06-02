@@ -12,7 +12,10 @@ DY=${FDATE:6:2}
 if [[ "${#FDATE}" != "8" || -z "${DSOURCE}" ]]; then
     echo "ml_ops.sh syntax error"
     echo "Please run ml_ops.sh again with the correct syntax:"
-    echo "./ml_ops.sh 19700101 flow"
+    echo "./ml_ops.sh YYYYMMDD TYPE [TOL]"
+    echo "for example:"
+    echo "./ml_ops.sh 20160122 dns 1e-6"
+    echo "./ml_ops.sh 20160122 flow"
     exit
 fi
 
