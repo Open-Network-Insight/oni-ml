@@ -128,7 +128,7 @@ var falsepositives : org.apache.spark.rdd.RDD[String]  = if (scoredFileExists){
     val DnsQryRcodeIndex = 6
     val DnsSevIndex = 18
     
-    val lines = Source.fromFile(feedback_file).getLines().toArray().drop(1)
+    val lines = Source.fromFile(feedback_file).getLines().toArray.drop(1)
     val feedback : org.apache.spark.rdd.RDD[String] = sc.parallelize(lines)
     val feedback_df = feedback.map(_.split(",")).map(row => Feedback(row(FrameTimeIndex),
                                                                                row(UnixTstampIndex),
