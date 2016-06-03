@@ -5,11 +5,11 @@ import scala.math._
 
 package main.scala {
 
-  object NetFlowTransformation {
+  object FlowTransformation {
 
     def addTime(row: Array[String]): Array[String] = {
-      val numTime = row(NetFlowColumnIndex.HOUR).toDouble + row(NetFlowColumnIndex.MINUTE).toDouble / 60 +
-        row(NetFlowColumnIndex.SECOND).toDouble / 3600
+      val numTime = row(FlowColumnIndex.HOUR).toDouble + row(FlowColumnIndex.MINUTE).toDouble / 60 +
+        row(FlowColumnIndex.SECOND).toDouble / 3600
       row.clone :+ numTime.toString
     }
 
@@ -17,9 +17,9 @@ package main.scala {
                            ibyt_cuts: Array[Double],
                            ipkt_cuts: Array[Double],
                            time_cuts: Array[Double]) = {
-      val time = row(NetFlowColumnIndex.NUMTIME).toDouble
-      val ibyt = row(NetFlowColumnIndex.IBYT).toDouble
-      val ipkt = row(NetFlowColumnIndex.IPKT).toDouble
+      val time = row(FlowColumnIndex.NUMTIME).toDouble
+      val ibyt = row(FlowColumnIndex.IBYT).toDouble
+      val ipkt = row(FlowColumnIndex.IPKT).toDouble
       var time_bin = 0
       var ibyt_bin = 0
       var ipkt_bin = 0
@@ -38,18 +38,18 @@ package main.scala {
 
     def adjustPort(row: Array[String]) = {
       var word_port = 111111.0
-      val sip = row(NetFlowColumnIndex.SOURCEIP)
-      val dip = row(NetFlowColumnIndex.DESTIP)
-      val dport = row(NetFlowColumnIndex.SOURCEPORT).toDouble
-      val sport = row(NetFlowColumnIndex.DESTPORT).toDouble
-      val ipkt_bin = row(NetFlowColumnIndex.IPKTYBIN).toDouble
-      val ibyt_bin = row(NetFlowColumnIndex.IBYTBIN).toDouble
-      val time_bin = row(NetFlowColumnIndex.TIMEBIN).toDouble
+      val sip = row(FlowColumnIndex.SOURCEIP)
+      val dip = row(FlowColumnIndex.DESTIP)
+      val dport = row(FlowColumnIndex.SOURCEPORT).toDouble
+      val sport = row(FlowColumnIndex.DESTPORT).toDouble
+      val ipkt_bin = row(FlowColumnIndex.IPKTYBIN).toDouble
+      val ibyt_bin = row(FlowColumnIndex.IBYTBIN).toDouble
+      val time_bin = row(FlowColumnIndex.TIMEBIN).toDouble
       var p_case = 0.0
 
-      var ip_pair = row(NetFlowColumnIndex.DESTIP) + " " + row(NetFlowColumnIndex.SOURCEIP)
+      var ip_pair = row(FlowColumnIndex.DESTIP) + " " + row(FlowColumnIndex.SOURCEIP)
       if (sip < dip & sip != 0) {
-        ip_pair = row(NetFlowColumnIndex.SOURCEIP) + " " + row(NetFlowColumnIndex.DESTIP)
+        ip_pair = row(FlowColumnIndex.SOURCEIP) + " " + row(FlowColumnIndex.DESTIP)
       }
 
       if ((dport <= 1024 | sport <= 1024) & (dport > 1024 | sport > 1024) & min(dport, sport) != 0) {

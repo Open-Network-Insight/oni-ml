@@ -1,8 +1,8 @@
 
 package main.scala
 
-import main.scala.NetFlowTransformation
-import main.scala.{NetFlowColumnIndex => indexOf}
+import main.scala.FlowTransformation
+import main.scala.{FlowColumnIndex => indexOf}
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.{SparkConf, SparkContext}
 import org.apache.spark.rdd.RDD
@@ -13,9 +13,6 @@ import scala.io.Source
 object FlowPreLDA {
 
   def run() = {
-    Logger.getLogger("org").setLevel(Level.OFF)
-    Logger.getLogger("akka").setLevel(Level.OFF)
-
     val conf = new SparkConf().setAppName("ONI ML: flow pre lda")
     val sc = new SparkContext(conf)
 
@@ -140,7 +137,7 @@ object FlowPreLDA {
 
     println("Trying to read file:  " + file)
     val rawdata: RDD[String] = sc.textFile(file)
-    val datanoheader: RDD[String] = NetFlowTransformation.removeHeader(rawdata)
+    val datanoheader: RDD[String] = FlowTransformation.removeHeader(rawdata)
 
     val scoredFileExists = new java.io.File(scoredFile).exists
 
@@ -160,7 +157,7 @@ object FlowPreLDA {
 
     val datagood: RDD[String] = totalData.filter(line => line.split(",").length == 27)
 
-    val data_with_time = datagood.map(_.trim.split(',')).map(NetFlowTransformation.addTime)
+    val data_with_time = datagood.map(_.trim.split(',')).map(FlowTransformation.addTime)
 
     println("calculating time cuts ...")
     time_cuts = Quantiles.distributedQuantilesQuant(Quantiles.computeEcdf(data_with_time.map(row => row(indexOf.NUMTIME).toDouble)))
@@ -172,9 +169,9 @@ object FlowPreLDA {
     ipkt_cuts = Quantiles.distributedQuantilesQuint(Quantiles.computeEcdf(data_with_time.map(row => row(16).toDouble)))
     println(ipkt_cuts.mkString(","))
 
-    val binned_data = data_with_time.map(row => NetFlowTransformation.binIbytIpktTime(row, ibyt_cuts, ipkt_cuts, time_cuts))
+    val binned_data = data_with_time.map(row => FlowTransformation.binIbytIpktTime(row, ibyt_cuts, ipkt_cuts, time_cuts))
 
-    val data_with_words = binned_data.map(row => NetFlowTransformation.adjustPort(row))
+    val data_with_words = binned_data.map(row => FlowTransformation.adjustPort(row))
 
     //next groupby src to get src word counts
     val src_word_counts = data_with_words.map(row => (row(indexOf.SOURCEIP) + " " + row(indexOf.SOURCEWORD), 1)).reduceByKey(_ + _)

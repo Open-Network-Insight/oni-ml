@@ -1,7 +1,7 @@
 package main.scala
 
-import main.scala.NetFlowTransformation
-import main.scala.{NetFlowColumnIndex => indexOf}
+import main.scala.FlowTransformation
+import main.scala.{FlowColumnIndex => indexOf}
 import org.apache.spark.storage.StorageLevel
 import org.apache.spark.{SparkConf, SparkContext}
 import breeze.linalg._
@@ -25,9 +25,7 @@ object FlowPostLDA {
 
         println("loading machine learning results")
         val topics_lines = sc.textFile(topic_mix_file)
-        //print(topics_lines)
         val words_lines = sc.textFile(pword_file)
-        //print(words_lines)
 
         val l_topics = topics_lines.map(line => {
             val ip = line.split(",")(0)
@@ -50,10 +48,10 @@ object FlowPostLDA {
         println("loading data")
         val rawdata = sc.textFile(file)
 
-        val datanoheader = NetFlowTransformation.removeHeader(rawdata)
+        val datanoheader = FlowTransformation.removeHeader(rawdata)
         val datagood = datanoheader.filter(line => line.split(",").length == 27)
 
-        val data_with_time = datagood.map(_.trim.split(",")).map(NetFlowTransformation.addTime)
+        val data_with_time = datagood.map(_.trim.split(",")).map(FlowTransformation.addTime)
 
         println("calculating time cuts ...")
         time_cuts = Quantiles.distributedQuantilesQuant(Quantiles.computeEcdf(data_with_time.map(row => row(indexOf.NUMTIME).toDouble)))
@@ -65,9 +63,9 @@ object FlowPostLDA {
         ipkt_cuts = Quantiles.distributedQuantilesQuint(Quantiles.computeEcdf(data_with_time.map(row => row(indexOf.IPKT).toDouble)))
         println(ipkt_cuts.mkString(","))
 
-        val binned_data = data_with_time.map(row => NetFlowTransformation.binIbytIpktTime(row, ibyt_cuts, ipkt_cuts, time_cuts))
+        val binned_data = data_with_time.map(row => FlowTransformation.binIbytIpktTime(row, ibyt_cuts, ipkt_cuts, time_cuts))
 
-        val data_with_words = binned_data.map(row => NetFlowTransformation.adjustPort(row))
+        val data_with_words = binned_data.map(row => FlowTransformation.adjustPort(row))
 
         val src_scored = data_with_words.map(row => {
             val topic_mix_1 = topics.value.getOrElse(row(indexOf.SOURCEIP), Array(0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05)).asInstanceOf[Array[Double]]
@@ -88,6 +86,7 @@ object FlowPostLDA {
         scored.persist(StorageLevel.MEMORY_AND_DISK)
         scored.saveAsTextFile(scored_output_file)
 
+        sc.stop()
     }
 
 }

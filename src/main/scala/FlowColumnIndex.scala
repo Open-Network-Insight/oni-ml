@@ -4,7 +4,7 @@ package main.scala
   * Created by rabarona on 6/2/2016.
   */
 package main.scala {
-  object NetFlowColumnIndex extends Enumeration {
+  object FlowColumnIndex extends Enumeration {
     val HOUR = 4
     val MINUTE = 5
     val SECOND = 6
