@@ -6,8 +6,10 @@ package main.scala {
 
   object Quantiles extends Serializable {
 
-
-    def compute_ecdf(x: RDD[Double]): RDD[(Double, Double)] = {
+    val QUANT = Array(0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9)
+    val QUINT = Array(0, 0.2, 0.4, 0.6, 0.8) 
+    
+    def computeEcdf(x: RDD[Double]): RDD[(Double, Double)] = {
       val counts = x.map(v => (v, 1)).reduceByKey(_ + _).sortByKey().cache()
       // compute the partition sums
       val partSums: Array[Double] = 0.0 +: counts.mapPartitionsWithIndex {
@@ -29,10 +31,10 @@ package main.scala {
       sumsRdd.map(elem => (elem._1, elem._2 / numValues))
     }
 
-    def distributed_quantiles(quantiles: Array[Double], ecdf: RDD[(Double, Double)]): Array[Double] = {
+    def distributedQuantilesQuant(ecdf: RDD[(Double, Double)]): Array[Double] = {
       def dqSeqOp(acc: Array[Double], value: (Double, Double)): Array[Double] = {
         val newacc: Array[Double] = acc
-        for ((quant, pos) <- quantiles.zipWithIndex) {
+        for ((quant, pos) <- QUANT.zipWithIndex) {
           newacc(pos) = if (value._2 < quant) {
             max(newacc(pos), value._1)
           } else {
@@ -41,12 +43,28 @@ package main.scala {
         }
         acc
       }
-
       def dqCombOp(acc1: Array[Double], acc2: Array[Double]) = {
         (acc1 zip acc2).map(tuple => max(tuple._1, tuple._2))
       }
+      ecdf.aggregate(Array.fill[Double](QUANT.length)(0))((acc, value) => dqSeqOp(acc, value), (acc1, acc2) => dqCombOp(acc1, acc2))
+    }
 
-      ecdf.aggregate(Array.fill[Double](quantiles.length)(0))((acc, value) => dqSeqOp(acc, value), (acc1, acc2) => dqCombOp(acc1, acc2))
+    def distributedQuantilesQuint(ecdf: RDD[(Double, Double)]): Array[Double] = {
+      def dqSeqOp(acc: Array[Double], value: (Double, Double)): Array[Double] = {
+        val newacc: Array[Double] = acc
+        for ((quant, pos) <- QUINT.zipWithIndex) {
+          newacc(pos) = if (value._2 < quant) {
+            max(newacc(pos), value._1)
+          } else {
+            newacc(pos)
+          }
+        }
+        acc
+      }
+      def dqCombOp(acc1: Array[Double], acc2: Array[Double]) = {
+        (acc1 zip acc2).map(tuple => max(tuple._1, tuple._2))
+      }
+      ecdf.aggregate(Array.fill[Double](QUINT.length)(0))((acc, value) => dqSeqOp(acc, value), (acc1, acc2) => dqCombOp(acc1, acc2))
     }
   }
 
