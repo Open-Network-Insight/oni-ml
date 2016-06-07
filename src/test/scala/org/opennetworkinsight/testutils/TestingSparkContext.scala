@@ -1,4 +1,4 @@
-package testutils
+package org.opennetworkinsight.testutils
 
 import java.util.Date
 

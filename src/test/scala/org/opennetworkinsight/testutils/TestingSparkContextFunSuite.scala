@@ -3,7 +3,7 @@
   * which has an Apache V2.0
   */
 
-package testutils
+package org.opennetworkinsight.testutils
 
 import org.apache.spark.SparkContext
 import org.scalatest.{BeforeAndAfterAll, FunSuite}

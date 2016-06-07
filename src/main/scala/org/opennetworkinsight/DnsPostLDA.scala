@@ -105,20 +105,20 @@ object DnsPostLDA {
         addcol("subdomain.entropy")
 
         logger.info("calculating time cuts ...")
-        time_cuts = Quantiles.distributedDeciles(Quantiles.computeEcdf(data_with_subdomains.map(r => r(col("unix_tstamp")).toDouble)))
+        time_cuts = Quantiles.computeDeciles(data_with_subdomains.map(r => r(col("unix_tstamp")).toDouble))
         logger.info(time_cuts.mkString(","))
 
         logger.info("calculating frame length cuts ...")
-        frame_length_cuts = Quantiles.distributedDeciles(Quantiles.computeEcdf(data_with_subdomains.map(r => r(col("frame_len")).toDouble)))
+        frame_length_cuts = Quantiles.computeDeciles(data_with_subdomains.map(r => r(col("frame_len")).toDouble))
         logger.info(frame_length_cuts.mkString(","))
         logger.info("calculating subdomain length cuts ...")
-        subdomain_length_cuts = Quantiles.distributedQuintiles(Quantiles.computeEcdf(data_with_subdomains.filter(r => r(col("subdomain.length")).toDouble > 0).map(r => r(col("subdomain.length")).toDouble)))
+        subdomain_length_cuts = Quantiles.computeQuintiles(data_with_subdomains.filter(r => r(col("subdomain.length")).toDouble > 0).map(r => r(col("subdomain.length")).toDouble))
         logger.info(subdomain_length_cuts.mkString(","))
         logger.info("calculating entropy cuts")
-        entropy_cuts = Quantiles.distributedQuintiles(Quantiles.computeEcdf(data_with_subdomains.filter(r => r(col("subdomain.entropy")).toDouble > 0).map(r => r(col("subdomain.entropy")).toDouble)))
+        entropy_cuts = Quantiles.computeQuintiles(data_with_subdomains.filter(r => r(col("subdomain.entropy")).toDouble > 0).map(r => r(col("subdomain.entropy")).toDouble))
         logger.info(entropy_cuts.mkString(","))
         logger.info("calculating num periods cuts ...")
-        numperiods_cuts = Quantiles.distributedQuintiles(Quantiles.computeEcdf(data_with_subdomains.filter(r => r(col("num.periods")).toDouble > 0).map(r => r(col("num.periods")).toDouble)))
+        numperiods_cuts = Quantiles.computeQuintiles(data_with_subdomains.filter(r => r(col("num.periods")).toDouble > 0).map(r => r(col("num.periods")).toDouble))
         logger.info(numperiods_cuts.mkString(","))
 
         var data = data_with_subdomains.map(line => line :+ {

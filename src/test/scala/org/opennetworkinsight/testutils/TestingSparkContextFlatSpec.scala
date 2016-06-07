@@ -2,24 +2,23 @@
   * THIS CODE WAS COPIED DIRECTLY FROM THE OPEN SOURCE PROJECT TAP (Trusted Analytics Platform)
   * which has an Apache V2.0
   */
-
-package testutils
+package org.opennetworkinsight.testutils
 
 import org.apache.spark.SparkContext
-import org.scalatest.{BeforeAndAfterAll, WordSpec}
+import org.scalatest.{BeforeAndAfter, FlatSpec}
 
-trait TestingSparkContextWordSpec extends WordSpec with BeforeAndAfterAll {
+trait TestingSparkContextFlatSpec extends FlatSpec with BeforeAndAfter {
 
   var sparkContext: SparkContext = null
 
-  override def beforeAll() = {
+  before {
     sparkContext = TestingSparkContext.sparkContext
   }
 
   /**
-   * Clean up after the test is done
-   */
-  override def afterAll() = {
+    * Clean up after the test is done
+    */
+  after {
     TestingSparkContext.cleanUp()
     sparkContext = null
   }

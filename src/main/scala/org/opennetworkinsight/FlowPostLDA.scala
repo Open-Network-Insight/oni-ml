@@ -63,13 +63,13 @@ object FlowPostLDA {
         val data_with_time = datagood.map(_.trim.split(",")).map(FlowWordCreation.addTime)
 
         logger.info("calculating time cuts ...")
-        time_cuts = Quantiles.distributedDeciles(Quantiles.computeEcdf(data_with_time.map(row => row(indexOf.NUMTIME).toDouble)))
+        time_cuts = Quantiles.computeDeciles(data_with_time.map(row => row(indexOf.NUMTIME).toDouble))
         logger.info(time_cuts.mkString(","))
         logger.info("calculating byte cuts ...")
-        ibyt_cuts = Quantiles.distributedDeciles(Quantiles.computeEcdf(data_with_time.map(row => row(indexOf.IBYT).toDouble)))
+        ibyt_cuts = Quantiles.computeDeciles(data_with_time.map(row => row(indexOf.IBYT).toDouble))
         logger.info(ibyt_cuts.mkString(","))
         logger.info("calculating pkt cuts")
-        ipkt_cuts = Quantiles.distributedQuintiles(Quantiles.computeEcdf(data_with_time.map(row => row(indexOf.IPKT).toDouble)))
+        ipkt_cuts = Quantiles.computeQuintiles(data_with_time.map(row => row(indexOf.IPKT).toDouble))
         logger.info(ipkt_cuts.mkString(","))
 
         val binned_data = data_with_time.map(row => FlowWordCreation.binIbytIpktTime(row, ibyt_cuts, ipkt_cuts, time_cuts))
