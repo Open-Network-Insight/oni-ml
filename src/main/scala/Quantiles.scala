@@ -4,7 +4,7 @@ import scala.math._
 
 package main.scala {
 
-  object Quantiles {
+  object Quantiles extends Serializable {
 
 
     def compute_ecdf(x: RDD[Double]): RDD[(Double, Double)] = {
