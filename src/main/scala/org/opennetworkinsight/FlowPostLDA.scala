@@ -5,6 +5,7 @@ import org.apache.log4j.{Level, Logger => apacheLogger}
 import org.apache.spark.storage.StorageLevel
 import org.apache.spark.{SparkConf, SparkContext}
 import org.slf4j.LoggerFactory
+import org.opennetworkinsight.{FlowColumnIndex => indexOf}
 
 /**
   * Contains routines for scoring incoming netflow records from a netflow suspicious connections model.

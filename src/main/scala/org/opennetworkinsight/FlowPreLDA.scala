@@ -5,6 +5,7 @@ import org.apache.log4j.{Level, Logger => apacheLogger}
 import org.apache.spark.rdd.RDD
 import org.apache.spark.{SparkConf, SparkContext}
 import org.slf4j.LoggerFactory
+import org.opennetworkinsight.{FlowColumnIndex => indexOf}
 
 import scala.io.Source
 
