@@ -2,13 +2,20 @@ package main.scala
 
 import main.scala.FlowTransformation
 import main.scala.{FlowColumnIndex => indexOf}
+import org.apache.log4j.{Level, Logger => apacheLogger }
 import org.apache.spark.storage.StorageLevel
 import org.apache.spark.{SparkConf, SparkContext}
+import org.slf4j.{LoggerFactory, Logger}
 import breeze.linalg._
-
 
 object FlowPostLDA {
     def run() = {
+
+        val logger = LoggerFactory.getLogger(this.getClass)
+        apacheLogger.getLogger("org").setLevel(Level.OFF)
+        apacheLogger.getLogger("akka").setLevel(Level.OFF)
+
+        logger.info("Flow post LDA starts")
 
         val conf = new SparkConf().setAppName("ONI ML: flow post lda")
         val sc = new SparkContext(conf)
@@ -23,7 +30,7 @@ object FlowPostLDA {
         var ipkt_cuts = new Array[Double](5)
         var time_cuts = new Array[Double](10)
 
-        println("loading machine learning results")
+        logger.info("loading machine learning results")
         val topics_lines = sc.textFile(topic_mix_file)
         val words_lines = sc.textFile(pword_file)
 
@@ -45,7 +52,7 @@ object FlowPostLDA {
 
         val words = sc.broadcast(l_words)
 
-        println("loading data")
+        logger.info("loading data")
         val rawdata = sc.textFile(file)
 
         val datanoheader = FlowTransformation.removeHeader(rawdata)
@@ -53,15 +60,15 @@ object FlowPostLDA {
 
         val data_with_time = datagood.map(_.trim.split(",")).map(FlowTransformation.addTime)
 
-        println("calculating time cuts ...")
+        logger.info("calculating time cuts ...")
         time_cuts = Quantiles.distributedQuantilesQuant(Quantiles.computeEcdf(data_with_time.map(row => row(indexOf.NUMTIME).toDouble)))
-        println(time_cuts.mkString(","))
-        println("calculating byte cuts ...")
+        logger.info(time_cuts.mkString(","))
+        logger.info("calculating byte cuts ...")
         ibyt_cuts = Quantiles.distributedQuantilesQuant(Quantiles.computeEcdf(data_with_time.map(row => row(indexOf.IBYT).toDouble)))
-        println(ibyt_cuts.mkString(","))
-        println("calculating pkt cuts")
+        logger.info(ibyt_cuts.mkString(","))
+        logger.info("calculating pkt cuts")
         ipkt_cuts = Quantiles.distributedQuantilesQuint(Quantiles.computeEcdf(data_with_time.map(row => row(indexOf.IPKT).toDouble)))
-        println(ipkt_cuts.mkString(","))
+        logger.info(ipkt_cuts.mkString(","))
 
         val binned_data = data_with_time.map(row => FlowTransformation.binIbytIpktTime(row, ibyt_cuts, ipkt_cuts, time_cuts))
 
@@ -83,10 +90,12 @@ object FlowPostLDA {
 
         val scored = src_scored.filter(elem => elem._1 < threshold).sortByKey().map(row => row._2.mkString(","))
 
+        logger.info("Persisting data")
         scored.persist(StorageLevel.MEMORY_AND_DISK)
         scored.saveAsTextFile(scored_output_file)
 
         sc.stop()
+        logger.info("Flow post LDA completed")
     }
 
 }

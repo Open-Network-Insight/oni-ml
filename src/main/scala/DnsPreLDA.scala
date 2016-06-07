@@ -1,14 +1,24 @@
 package main.scala
 
 import main.scala.DNSTransformation
+import org.apache.log4j.{Level, Logger => apacheLogger}
 import org.apache.spark.{SparkConf, SparkContext}
 import org.apache.spark.storage.StorageLevel
 import org.apache.spark.sql.SQLContext
+import org.slf4j.{LoggerFactory, Logger}
+
 import scala.io.Source
+
 
 object DnsPreLDA {
 
     def run() = {
+
+        val logger = LoggerFactory.getLogger(this.getClass)
+        apacheLogger.getLogger("org").setLevel(Level.OFF)
+        apacheLogger.getLogger("akka").setLevel(Level.OFF)
+
+        logger.info("DNS pre LDA starts")
 
         val conf = new SparkConf().setAppName("ONI ML: dns pre lda")
         val sc = new SparkContext(conf)
@@ -47,6 +57,7 @@ object DnsPreLDA {
             tempRDD
         }
 
+        print("Read source data")
         val rawdata: org.apache.spark.rdd.RDD[String] = {
             if (feedback_file == "None") {
                 multidata
@@ -82,7 +93,7 @@ object DnsPreLDA {
 
         val country_codes = sc.broadcast(DNSTransformation.l_country_codes)
 
-        println("Computing subdomain info")
+        logger.info("Computing subdomain info")
 
         var data_with_subdomains = datagood.map(row => row ++ DNSTransformation.extractSubdomain(country_codes, row(col("dns_qry_name"))))
         addcol("domain")
@@ -93,22 +104,22 @@ object DnsPreLDA {
         data_with_subdomains = data_with_subdomains.map(data => data :+ DNSTransformation.entropy(data(col("subdomain"))).toString)
         addcol("subdomain.entropy")
 
-        println("calculating time cuts ...")
+        logger.info("Calculating time cuts ...")
         time_cuts = Quantiles.distributedQuantilesQuant(Quantiles.computeEcdf(data_with_subdomains.map(r => r(col("unix_tstamp")).toDouble)))
-        println(time_cuts.mkString(","))
+        logger.info(time_cuts.mkString(","))
 
-        println("calculating frame length cuts ...")
+        logger.info("Calculating frame length cuts ...")
         frame_length_cuts = Quantiles.distributedQuantilesQuant(Quantiles.computeEcdf(data_with_subdomains.map(r => r(col("frame_len")).toDouble)))
-        println(frame_length_cuts.mkString(","))
-        println("calculating subdomain length cuts ...")
+        logger.info(frame_length_cuts.mkString(","))
+        logger.info("Calculating subdomain length cuts ...")
         subdomain_length_cuts = Quantiles.distributedQuantilesQuint(Quantiles.computeEcdf(data_with_subdomains.filter(r => r(col("subdomain.length")).toDouble > 0).map(r => r(col("subdomain.length")).toDouble)))
-        println(subdomain_length_cuts.mkString(","))
-        println("calculating entropy cuts")
+        logger.info(subdomain_length_cuts.mkString(","))
+        logger.info("Calculating entropy cuts")
         entropy_cuts = Quantiles.distributedQuantilesQuint(Quantiles.computeEcdf(data_with_subdomains.filter(r => r(col("subdomain.entropy")).toDouble > 0).map(r => r(col("subdomain.entropy")).toDouble)))
-        println(entropy_cuts.mkString(","))
-        println("calculating num periods cuts ...")
+        logger.info(entropy_cuts.mkString(","))
+        logger.info("Calculating num periods cuts ...")
         numperiods_cuts = Quantiles.distributedQuantilesQuint(Quantiles.computeEcdf(data_with_subdomains.filter(r => r(col("num.periods")).toDouble > 0).map(r => r(col("num.periods")).toDouble)))
-        println(numperiods_cuts.mkString(","))
+        logger.info(numperiods_cuts.mkString(","))
 
         var data = data_with_subdomains.map(line => line :+ {
             if (line(col("domain")) == "intel") {
@@ -119,7 +130,7 @@ object DnsPreLDA {
         })
         addcol("top_domain")
 
-        println("adding words")
+        logger.info("Adding words")
         data = data.map(row => {
             val word = row(col("top_domain")) + "_" + DNSTransformation.binColumn(row(col("frame_len")), frame_length_cuts) + "_" +
               DNSTransformation.binColumn(row(col("unix_tstamp")), time_cuts) + "_" +
@@ -130,12 +141,13 @@ object DnsPreLDA {
         })
         addcol("word")
 
+        logger.info("Persisting data")
         val wc = data.map(row => (row(col("ip_dst")) + " " + row(col("word")), 1)).reduceByKey(_ + _).map(row => (row._1.split(" ")(0) + "," + row._1.split(" ")(1).toString + "," + row._2).mkString)
         wc.persist(StorageLevel.MEMORY_AND_DISK)
         wc.saveAsTextFile(outputfile)
 
         sc.stop()
-
+        logger.info("DNS pre LDA completed")
     }
 }
 

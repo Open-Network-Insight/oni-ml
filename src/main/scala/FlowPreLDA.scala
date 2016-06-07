@@ -3,9 +3,10 @@ package main.scala
 
 import main.scala.FlowTransformation
 import main.scala.{FlowColumnIndex => indexOf}
-import org.apache.log4j.{Level, Logger}
+import org.apache.log4j.{Level, Logger => apacheLogger}
 import org.apache.spark.{SparkConf, SparkContext}
 import org.apache.spark.rdd.RDD
+import org.slf4j.{LoggerFactory, Logger}
 
 
 import scala.io.Source
@@ -13,6 +14,13 @@ import scala.io.Source
 object FlowPreLDA {
 
   def run() = {
+
+    val logger = LoggerFactory.getLogger(this.getClass)
+    apacheLogger.getLogger("org").setLevel(Level.OFF)
+    apacheLogger.getLogger("akka").setLevel(Level.OFF)
+
+    logger.info("Flow pre LDA starts")
+
     val conf = new SparkConf().setAppName("ONI ML: flow pre lda")
     val sc = new SparkContext(conf)
 
@@ -23,9 +31,9 @@ object FlowPreLDA {
     val output_file_for_lda = System.getenv("HPATH") + "/lda_word_counts"
 
 
-    println("scoredFile:  " + scoredFile)
-    println("outputFile:  " + output_file)
-    println("output_file_for_lda:  " + output_file_for_lda)
+    logger.info("scoredFile:  " + scoredFile)
+    logger.info("outputFile:  " + output_file)
+    logger.info("output_file_for_lda:  " + output_file_for_lda)
 
     var ibyt_cuts = new Array[Double](10)
     var ipkt_cuts = new Array[Double](5)
@@ -135,7 +143,7 @@ object FlowPreLDA {
       buf.toString()
     }
 
-    println("Trying to read file:  " + file)
+    logger.info("Trying to read file:  " + file)
     val rawdata: RDD[String] = sc.textFile(file)
     val datanoheader: RDD[String] = FlowTransformation.removeHeader(rawdata)
 
@@ -145,9 +153,9 @@ object FlowPreLDA {
       val duplicationFactor = System.getenv("DUPFACTOR").toInt
 
       val rowsToDuplicate = Source.fromFile(scoredFile).getLines().toArray.drop(1).filter(l => (l.split(',').length == 22) && l.split(',')(0).toInt == 3)
-      println("User feedback read from: " + scoredFile + ". "
+      logger.info("User feedback read from: " + scoredFile + ". "
         + rowsToDuplicate.length + " many connections flagged nonthreatening.")
-      println("Duplication factor: " + duplicationFactor)
+      logger.info("Duplication factor: " + duplicationFactor)
       rowsToDuplicate.map(convert_feedback_row_to_flow_row(_)).flatMap(List.fill(duplicationFactor)(_))
     } else {
       Array[String]()
@@ -159,15 +167,15 @@ object FlowPreLDA {
 
     val data_with_time = datagood.map(_.trim.split(',')).map(FlowTransformation.addTime)
 
-    println("calculating time cuts ...")
+    logger.info("calculating time cuts ...")
     time_cuts = Quantiles.distributedQuantilesQuant(Quantiles.computeEcdf(data_with_time.map(row => row(indexOf.NUMTIME).toDouble)))
-    println(time_cuts.mkString(","))
-    println("calculating byte cuts ...")
+    logger.info(time_cuts.mkString(","))
+    logger.info("calculating byte cuts ...")
     ibyt_cuts = Quantiles.distributedQuantilesQuant(Quantiles.computeEcdf(data_with_time.map(row => row(indexOf.IBYT).toDouble)))
-    println(ibyt_cuts.mkString(","))
-    println("calculating pkt cuts")
+    logger.info(ibyt_cuts.mkString(","))
+    logger.info("calculating pkt cuts")
     ipkt_cuts = Quantiles.distributedQuantilesQuint(Quantiles.computeEcdf(data_with_time.map(row => row(16).toDouble)))
-    println(ipkt_cuts.mkString(","))
+    logger.info(ipkt_cuts.mkString(","))
 
     val binned_data = data_with_time.map(row => FlowTransformation.binIbytIpktTime(row, ibyt_cuts, ipkt_cuts, time_cuts))
 
@@ -183,9 +191,11 @@ object FlowPreLDA {
     //val word_counts = sc.union(src_word_counts, dest_word_counts).map(row => Array(row._1.split(" ")(0).toString, row._1.split(" ")(1).toString, row._2).toString)
     val word_counts = sc.union(src_word_counts, dest_word_counts).map(row => (row._1.split(" ")(0) + "," + row._1.split(" ")(1).toString + "," + row._2).mkString)
 
+    logger.info("Persisting data")
     word_counts.saveAsTextFile(output_file)
 
     sc.stop()
+    logger.info("Flow pre LDA completed")
 
   }
 

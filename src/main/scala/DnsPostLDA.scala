@@ -3,13 +3,21 @@ package main.scala
 
 import main.scala.DNSTransformation
 import scala.io.Source
+import org.apache.log4j.{Level, Logger => apacheLogger}
 import org.apache.spark.storage.StorageLevel
 import org.apache.spark.{SparkConf, SparkContext}
 import org.apache.spark.sql.SQLContext
+import org.slf4j.{LoggerFactory, Logger}
 
 object DnsPostLDA {
 
     def run() = {
+
+        val logger = LoggerFactory.getLogger(this.getClass)
+        apacheLogger.getLogger("org").setLevel(Level.OFF)
+        apacheLogger.getLogger("akka").setLevel(Level.OFF)
+
+        logger.info("DNS post LDA starts")
 
         val conf = new SparkConf().setAppName("ONI ML: dns post lda")
         val sc = new SparkContext(conf)
@@ -82,7 +90,7 @@ object DnsPostLDA {
 
         val country_codes = sc.broadcast(DNSTransformation.l_country_codes)
 
-        println("Computing subdomain info")
+        logger.info("Computing subdomain info")
 
         var data_with_subdomains = datagood.map(row => row ++ DNSTransformation.extractSubdomain(country_codes,row(col("dns_qry_name"))))
         addcol("domain")
@@ -93,22 +101,22 @@ object DnsPostLDA {
         data_with_subdomains = data_with_subdomains.map(data => data :+ DNSTransformation.entropy(data(col("subdomain"))).toString)
         addcol("subdomain.entropy")
 
-        println("calculating time cuts ...")
+        logger.info("calculating time cuts ...")
         time_cuts = Quantiles.distributedQuantilesQuant(Quantiles.computeEcdf(data_with_subdomains.map(r => r(col("unix_tstamp")).toDouble)))
-        println(time_cuts.mkString(","))
+        logger.info(time_cuts.mkString(","))
 
-        println("calculating frame length cuts ...")
+        logger.info("calculating frame length cuts ...")
         frame_length_cuts = Quantiles.distributedQuantilesQuant(Quantiles.computeEcdf(data_with_subdomains.map(r => r(col("frame_len")).toDouble)))
-        println(frame_length_cuts.mkString(","))
-        println("calculating subdomain length cuts ...")
+        logger.info(frame_length_cuts.mkString(","))
+        logger.info("calculating subdomain length cuts ...")
         subdomain_length_cuts = Quantiles.distributedQuantilesQuint(Quantiles.computeEcdf(data_with_subdomains.filter(r => r(col("subdomain.length")).toDouble > 0).map(r => r(col("subdomain.length")).toDouble)))
-        println(subdomain_length_cuts.mkString(","))
-        println("calculating entropy cuts")
+        logger.info(subdomain_length_cuts.mkString(","))
+        logger.info("calculating entropy cuts")
         entropy_cuts = Quantiles.distributedQuantilesQuint(Quantiles.computeEcdf(data_with_subdomains.filter(r => r(col("subdomain.entropy")).toDouble > 0).map(r => r(col("subdomain.entropy")).toDouble)))
-        println(entropy_cuts.mkString(","))
-        println("calculating num periods cuts ...")
+        logger.info(entropy_cuts.mkString(","))
+        logger.info("calculating num periods cuts ...")
         numperiods_cuts = Quantiles.distributedQuantilesQuint(Quantiles.computeEcdf(data_with_subdomains.filter(r => r(col("num.periods")).toDouble > 0).map(r => r(col("num.periods")).toDouble)))
-        println(numperiods_cuts.mkString(","))
+        logger.info(numperiods_cuts.mkString(","))
 
         var data = data_with_subdomains.map(line => line :+ {
             if (line(col("domain")) == "intel") {
@@ -119,7 +127,7 @@ object DnsPostLDA {
         })
         addcol("top_domain")
 
-        println("adding words")
+        logger.info("adding words")
         data = data.map(row => {
             val word = row(col("top_domain")) + "_" + DNSTransformation.binColumn(row(col("frame_len")), frame_length_cuts) + "_" +
               DNSTransformation.binColumn(row(col("unix_tstamp")), time_cuts) + "_" +
@@ -130,7 +138,7 @@ object DnsPostLDA {
         })
         addcol("word")
 
-        println("Computing conditional probability")
+        logger.info("Computing conditional probability")
 
         val src_scored = data.map(row => {
             val topic_mix = topics.value.getOrElse(row(col("ip_dst")), Array(0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1)).asInstanceOf[Array[Double]]
@@ -143,10 +151,13 @@ object DnsPostLDA {
         })
 
         addcol("score")
+
+        logger.info("Persisting data")
         val scored = src_scored.filter(elem => elem._1 < threshold).sortByKey().map(row => row._2.mkString(","))
-        println(scored.count())
-        scored.take(10).foreach(println)
         scored.persist(StorageLevel.MEMORY_AND_DISK)
         scored.saveAsTextFile(scored_output_file)
+
+        sc.stop()
+        logger.info("DNS pre LDA completed")
     }
 }
