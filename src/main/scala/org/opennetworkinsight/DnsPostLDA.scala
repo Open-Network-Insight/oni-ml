@@ -1,14 +1,17 @@
 
-package main.scala
+package org.opennetworkinsight
 
-import main.scala.DNSTransformation
-import scala.io.Source
 import org.apache.log4j.{Level, Logger => apacheLogger}
+import org.apache.spark.sql.SQLContext
 import org.apache.spark.storage.StorageLevel
 import org.apache.spark.{SparkConf, SparkContext}
-import org.apache.spark.sql.SQLContext
-import org.slf4j.{LoggerFactory, Logger}
+import org.slf4j.LoggerFactory
 
+import scala.io.Source
+
+/**
+  * Contains routines for scoring incoming netflow records from a DNS suspicious connections model.
+  */
 object DnsPostLDA {
 
     def run() = {
@@ -80,7 +83,7 @@ object DnsPostLDA {
             multidata
         }
 
-        val col = DNSTransformation.getColumnNames(df_cols)
+        val col = DNSWordCreation.getColumnNames(df_cols)
 
         def addcol(colname: String) = if (!col.keySet.exists(_ == colname)) {
             col(colname) = col.values.max + 1
@@ -88,17 +91,17 @@ object DnsPostLDA {
 
         val datagood = rawdata.map(line => line.split(",")).filter(line => (line.length == df_cols.length))
 
-        val country_codes = sc.broadcast(DNSTransformation.l_country_codes)
+        val country_codes = sc.broadcast(DNSWordCreation.l_country_codes)
 
         logger.info("Computing subdomain info")
 
-        var data_with_subdomains = datagood.map(row => row ++ DNSTransformation.extractSubdomain(country_codes,row(col("dns_qry_name"))))
+        var data_with_subdomains = datagood.map(row => row ++ DNSWordCreation.extractSubdomain(country_codes,row(col("dns_qry_name"))))
         addcol("domain")
         addcol("subdomain")
         addcol("subdomain.length")
         addcol("num.periods")
 
-        data_with_subdomains = data_with_subdomains.map(data => data :+ DNSTransformation.entropy(data(col("subdomain"))).toString)
+        data_with_subdomains = data_with_subdomains.map(data => data :+ DNSWordCreation.entropy(data(col("subdomain"))).toString)
         addcol("subdomain.entropy")
 
         logger.info("calculating time cuts ...")
@@ -129,11 +132,11 @@ object DnsPostLDA {
 
         logger.info("adding words")
         data = data.map(row => {
-            val word = row(col("top_domain")) + "_" + DNSTransformation.binColumn(row(col("frame_len")), frame_length_cuts) + "_" +
-              DNSTransformation.binColumn(row(col("unix_tstamp")), time_cuts) + "_" +
-              DNSTransformation.binColumn(row(col("subdomain.length")), subdomain_length_cuts) + "_" +
-              DNSTransformation.binColumn(row(col("subdomain.entropy")), entropy_cuts) + "_" +
-              DNSTransformation.binColumn(row(col("num.periods")), numperiods_cuts) + "_" + row(col("dns_qry_type")) + "_" + row(col("dns_qry_rcode"))
+            val word = row(col("top_domain")) + "_" + DNSWordCreation.binColumn(row(col("frame_len")), frame_length_cuts) + "_" +
+              DNSWordCreation.binColumn(row(col("unix_tstamp")), time_cuts) + "_" +
+              DNSWordCreation.binColumn(row(col("subdomain.length")), subdomain_length_cuts) + "_" +
+              DNSWordCreation.binColumn(row(col("subdomain.entropy")), entropy_cuts) + "_" +
+              DNSWordCreation.binColumn(row(col("num.periods")), numperiods_cuts) + "_" + row(col("dns_qry_type")) + "_" + row(col("dns_qry_rcode"))
             row :+ word
         })
         addcol("word")

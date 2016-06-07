@@ -1,10 +1,6 @@
-package main.scala
+package org.opennetworkinsight
 
-/**
-  * Created by rabarona on 6/2/2016.
-  */
-package main.scala {
-  object FlowColumnIndex extends Enumeration {
+object FlowColumnIndex extends Enumeration {
     val HOUR = 4
     val MINUTE = 5
     val SECOND = 6
@@ -21,5 +17,4 @@ package main.scala {
     val SOURCEWORD = 33
     val DESTWORD = 34
   }
-}
 

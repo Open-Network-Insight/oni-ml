@@ -1,13 +1,14 @@
-package main.scala
+package org.opennetworkinsight
 
-import main.scala.FlowTransformation
-import main.scala.{FlowColumnIndex => indexOf}
-import org.apache.log4j.{Level, Logger => apacheLogger }
+import breeze.linalg._
+import org.apache.log4j.{Level, Logger => apacheLogger}
 import org.apache.spark.storage.StorageLevel
 import org.apache.spark.{SparkConf, SparkContext}
-import org.slf4j.{LoggerFactory, Logger}
-import breeze.linalg._
+import org.slf4j.LoggerFactory
 
+/**
+  * Contains routines for scoring incoming netflow records from a netflow suspicious connections model.
+  */
 object FlowPostLDA {
     def run() = {
 
@@ -55,10 +56,10 @@ object FlowPostLDA {
         logger.info("loading data")
         val rawdata = sc.textFile(file)
 
-        val datanoheader = FlowTransformation.removeHeader(rawdata)
+        val datanoheader = FlowWordCreation.removeHeader(rawdata)
         val datagood = datanoheader.filter(line => line.split(",").length == 27)
 
-        val data_with_time = datagood.map(_.trim.split(",")).map(FlowTransformation.addTime)
+        val data_with_time = datagood.map(_.trim.split(",")).map(FlowWordCreation.addTime)
 
         logger.info("calculating time cuts ...")
         time_cuts = Quantiles.distributedQuantilesQuant(Quantiles.computeEcdf(data_with_time.map(row => row(indexOf.NUMTIME).toDouble)))
@@ -70,9 +71,9 @@ object FlowPostLDA {
         ipkt_cuts = Quantiles.distributedQuantilesQuint(Quantiles.computeEcdf(data_with_time.map(row => row(indexOf.IPKT).toDouble)))
         logger.info(ipkt_cuts.mkString(","))
 
-        val binned_data = data_with_time.map(row => FlowTransformation.binIbytIpktTime(row, ibyt_cuts, ipkt_cuts, time_cuts))
+        val binned_data = data_with_time.map(row => FlowWordCreation.binIbytIpktTime(row, ibyt_cuts, ipkt_cuts, time_cuts))
 
-        val data_with_words = binned_data.map(row => FlowTransformation.adjustPort(row))
+        val data_with_words = binned_data.map(row => FlowWordCreation.adjustPort(row))
 
         val src_scored = data_with_words.map(row => {
             val topic_mix_1 = topics.value.getOrElse(row(indexOf.SOURCEIP), Array(0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05)).asInstanceOf[Array[Double]]
