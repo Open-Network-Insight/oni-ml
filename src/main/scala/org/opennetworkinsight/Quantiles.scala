@@ -47,6 +47,7 @@ object Quantiles extends Serializable {
     *         ith entry of returned quantiles array, then x is the minimum value in the input dataset so that
     *         a >= t fraction of the mass of the input is <= x.
     *         IE. x is the least x so that Pr ( X <= x ) >= t
+    *         In the case of an empty input dataset, the quantile cutoffs returned are all positive infinity.
     */
 
   def computeQuantiles(data: RDD[Double], quantiles: Array[Double]): Array[Double] = {

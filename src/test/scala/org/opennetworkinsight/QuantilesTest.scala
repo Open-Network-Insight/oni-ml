@@ -1,5 +1,6 @@
 package org.opennetworkinsight
 
+import org.apache.spark.rdd.RDD
 import org.scalatest.Matchers
 import testutils.TestingSparkContextFlatSpec
 
@@ -10,6 +11,15 @@ class QuantilesTest extends TestingSparkContextFlatSpec with Matchers {
   val onesAndTwos = List(1.0, 2.0, 1.0, 2.0)
   val countToTen = List(1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0)
 
+
+  "ecdf" should "work on an empty list" in {
+    val rddIn: RDD[Double] = sparkContext.parallelize(List())
+    val rddOut = Quantiles.computeEcdf(rddIn)
+
+    val out = rddOut.collect()
+
+    out.length shouldBe 0
+  }
 
   "ecdf" should "work on a constant list" in {
     val rddIn = sparkContext.parallelize(allOnes)
@@ -51,6 +61,16 @@ class QuantilesTest extends TestingSparkContextFlatSpec with Matchers {
     out(9) shouldBe(10.0, 1.0)
   }
 
+  "quantiles" should "work on an empty list" in {
+    val rddIn: RDD[Double] = sparkContext.parallelize(List())
+    val quantiles = Array(0.0, 0.5)
+    val out = Quantiles.computeQuantiles(rddIn, quantiles)
+
+    out.length shouldBe 2
+    out(0) shouldBe Double.PositiveInfinity
+    out(1) shouldBe Double.PositiveInfinity
+  }
+
   "quantiles" should "work on all ones list" in {
     val rddIn = sparkContext.parallelize(allOnes)
     val quantiles = Array(0.0, 0.5)
@@ -59,7 +79,6 @@ class QuantilesTest extends TestingSparkContextFlatSpec with Matchers {
     out.length shouldBe 2
     out(0) shouldBe 1.0
     out(1) shouldBe 1.0
-
   }
 
   "quantiles" should "work on a 50/50 1s and 2s list" in {
