@@ -1,15 +1,16 @@
-package main.scala
+package org.opennetworkinsight
 
-import main.scala.DNSTransformation
 import org.apache.log4j.{Level, Logger => apacheLogger}
-import org.apache.spark.{SparkConf, SparkContext}
-import org.apache.spark.storage.StorageLevel
 import org.apache.spark.sql.SQLContext
-import org.slf4j.{LoggerFactory, Logger}
+import org.apache.spark.storage.StorageLevel
+import org.apache.spark.{SparkConf, SparkContext}
+import org.slf4j.LoggerFactory
 
 import scala.io.Source
 
-
+/**
+  * Contains routines for creating the "words" for a suspicious connects analysis from incoming DNS records.
+  */
 object DnsPreLDA {
 
     def run() = {
@@ -74,7 +75,7 @@ object DnsPreLDA {
             }
         }
 
-        val col = DNSTransformation.getColumnNames(df_cols)
+        val col = DNSWordCreation.getColumnNames(df_cols)
 
         def addcol(colname: String) = if (!col.keySet.exists(_ == colname)) {
             col(colname) = col.values.max + 1
@@ -91,34 +92,34 @@ object DnsPreLDA {
             }
         })
 
-        val country_codes = sc.broadcast(DNSTransformation.l_country_codes)
+        val country_codes = sc.broadcast(DNSWordCreation.l_country_codes)
 
         logger.info("Computing subdomain info")
 
-        var data_with_subdomains = datagood.map(row => row ++ DNSTransformation.extractSubdomain(country_codes, row(col("dns_qry_name"))))
+        var data_with_subdomains = datagood.map(row => row ++ DNSWordCreation.extractSubdomain(country_codes, row(col("dns_qry_name"))))
         addcol("domain")
         addcol("subdomain")
         addcol("subdomain.length")
         addcol("num.periods")
 
-        data_with_subdomains = data_with_subdomains.map(data => data :+ DNSTransformation.entropy(data(col("subdomain"))).toString)
+        data_with_subdomains = data_with_subdomains.map(data => data :+ DNSWordCreation.entropy(data(col("subdomain"))).toString)
         addcol("subdomain.entropy")
 
         logger.info("Calculating time cuts ...")
-        time_cuts = Quantiles.distributedQuantilesQuant(Quantiles.computeEcdf(data_with_subdomains.map(r => r(col("unix_tstamp")).toDouble)))
+        time_cuts = Quantiles.distributedDeciles(Quantiles.computeEcdf(data_with_subdomains.map(r => r(col("unix_tstamp")).toDouble)))
         logger.info(time_cuts.mkString(","))
 
         logger.info("Calculating frame length cuts ...")
-        frame_length_cuts = Quantiles.distributedQuantilesQuant(Quantiles.computeEcdf(data_with_subdomains.map(r => r(col("frame_len")).toDouble)))
+        frame_length_cuts = Quantiles.distributedDeciles(Quantiles.computeEcdf(data_with_subdomains.map(r => r(col("frame_len")).toDouble)))
         logger.info(frame_length_cuts.mkString(","))
         logger.info("Calculating subdomain length cuts ...")
-        subdomain_length_cuts = Quantiles.distributedQuantilesQuint(Quantiles.computeEcdf(data_with_subdomains.filter(r => r(col("subdomain.length")).toDouble > 0).map(r => r(col("subdomain.length")).toDouble)))
+        subdomain_length_cuts = Quantiles.distributedQuintiles(Quantiles.computeEcdf(data_with_subdomains.filter(r => r(col("subdomain.length")).toDouble > 0).map(r => r(col("subdomain.length")).toDouble)))
         logger.info(subdomain_length_cuts.mkString(","))
         logger.info("Calculating entropy cuts")
-        entropy_cuts = Quantiles.distributedQuantilesQuint(Quantiles.computeEcdf(data_with_subdomains.filter(r => r(col("subdomain.entropy")).toDouble > 0).map(r => r(col("subdomain.entropy")).toDouble)))
+        entropy_cuts = Quantiles.distributedQuintiles(Quantiles.computeEcdf(data_with_subdomains.filter(r => r(col("subdomain.entropy")).toDouble > 0).map(r => r(col("subdomain.entropy")).toDouble)))
         logger.info(entropy_cuts.mkString(","))
         logger.info("Calculating num periods cuts ...")
-        numperiods_cuts = Quantiles.distributedQuantilesQuint(Quantiles.computeEcdf(data_with_subdomains.filter(r => r(col("num.periods")).toDouble > 0).map(r => r(col("num.periods")).toDouble)))
+        numperiods_cuts = Quantiles.distributedQuintiles(Quantiles.computeEcdf(data_with_subdomains.filter(r => r(col("num.periods")).toDouble > 0).map(r => r(col("num.periods")).toDouble)))
         logger.info(numperiods_cuts.mkString(","))
 
         var data = data_with_subdomains.map(line => line :+ {
@@ -132,11 +133,11 @@ object DnsPreLDA {
 
         logger.info("Adding words")
         data = data.map(row => {
-            val word = row(col("top_domain")) + "_" + DNSTransformation.binColumn(row(col("frame_len")), frame_length_cuts) + "_" +
-              DNSTransformation.binColumn(row(col("unix_tstamp")), time_cuts) + "_" +
-              DNSTransformation.binColumn(row(col("subdomain.length")), subdomain_length_cuts) + "_" +
-              DNSTransformation.binColumn(row(col("subdomain.entropy")), entropy_cuts) + "_" +
-              DNSTransformation.binColumn(row(col("num.periods")), numperiods_cuts) + "_" + row(col("dns_qry_type")) + "_" + row(col("dns_qry_rcode"))
+            val word = row(col("top_domain")) + "_" + DNSWordCreation.binColumn(row(col("frame_len")), frame_length_cuts) + "_" +
+              DNSWordCreation.binColumn(row(col("unix_tstamp")), time_cuts) + "_" +
+              DNSWordCreation.binColumn(row(col("subdomain.length")), subdomain_length_cuts) + "_" +
+              DNSWordCreation.binColumn(row(col("subdomain.entropy")), entropy_cuts) + "_" +
+              DNSWordCreation.binColumn(row(col("num.periods")), numperiods_cuts) + "_" + row(col("dns_qry_type")) + "_" + row(col("dns_qry_rcode"))
             row :+ word
         })
         addcol("word")

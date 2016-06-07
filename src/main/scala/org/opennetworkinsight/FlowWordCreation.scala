@@ -1,11 +1,10 @@
-package main.scala
+package org.opennetworkinsight
 
 import org.apache.spark.rdd.RDD
+
 import scala.math._
 
-package main.scala {
-
-  object FlowTransformation {
+object FlowWordCreation {
 
     def addTime(row: Array[String]): Array[String] = {
       val numTime = row(FlowColumnIndex.HOUR).toDouble + row(FlowColumnIndex.MINUTE).toDouble / 60 +
@@ -95,5 +94,4 @@ package main.scala {
       output
     }
   }
-}
 

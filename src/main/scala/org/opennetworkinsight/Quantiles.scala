@@ -1,16 +1,28 @@
-import org.apache.spark.rdd.RDD
+package org.opennetworkinsight
 
+import org.apache.spark.rdd.RDD
+import org.apache.spark.rdd._
 import scala.math._
 
-package main.scala {
+/**
+  * Contains routines for the distributed calculation of quantiles and the empirical cumulative distribution function.
+  */
 
-  object Quantiles extends Serializable {
+object Quantiles extends Serializable {
+
 
     val QUANT = Array(0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9)
-    val QUINT = Array(0, 0.2, 0.4, 0.6, 0.8) 
-    
-    def computeEcdf(x: RDD[Double]): RDD[(Double, Double)] = {
-      val counts = x.map(v => (v, 1)).reduceByKey(_ + _).sortByKey().cache()
+    val QUINT = Array(0, 0.2, 0.4, 0.6, 0.8)
+
+  /**
+    * Compute the empirical cumulative distribution function.
+    *
+    * @param data An RDD of doubles.
+    * @return RDD[(Double,Double)] where each pair is of the form (val, Frac(data <= val))
+    *         That is, each pair is a value and the fraction of the input data less-than-or-equal to the value.
+    */
+    def computeEcdf(data: RDD[Double]): RDD[(Double, Double)] = {
+      val counts = data.map(v => (v, 1)).reduceByKey(_ + _).sortByKey().cache()
       // compute the partition sums
       val partSums: Array[Double] = 0.0 +: counts.mapPartitionsWithIndex {
         case (index, partition) => Iterator(partition.map({ case (sample, count) => count }).sum.toDouble)
@@ -31,7 +43,12 @@ package main.scala {
       sumsRdd.map(elem => (elem._1, elem._2 / numValues))
     }
 
-    def distributedQuantilesQuant(ecdf: RDD[(Double, Double)]): Array[Double] = {
+  /**
+    * Compute the deciles of a distribution.
+    * @param ecdf RDD[(Double, Double)] The empirical cumulative  distribution function of the distribution.
+    * @return Array[Double].  The deciles of the distribution.
+    */
+    def distributedDeciles(ecdf: RDD[(Double, Double)]): Array[Double] = {
       def dqSeqOp(acc: Array[Double], value: (Double, Double)): Array[Double] = {
         val newacc: Array[Double] = acc
         for ((quant, pos) <- QUANT.zipWithIndex) {
@@ -49,7 +66,12 @@ package main.scala {
       ecdf.aggregate(Array.fill[Double](QUANT.length)(0))((acc, value) => dqSeqOp(acc, value), (acc1, acc2) => dqCombOp(acc1, acc2))
     }
 
-    def distributedQuantilesQuint(ecdf: RDD[(Double, Double)]): Array[Double] = {
+  /**
+    * Compute the quintiles of a distribution.
+    * @param ecdf RDD[(Double, Double)] The empirical cumulative  distribution function of the distribution.
+    * @return Array[Double].  The quintiles of the distribution.
+    */
+    def distributedQuintiles(ecdf: RDD[(Double, Double)]): Array[Double] = {
       def dqSeqOp(acc: Array[Double], value: (Double, Double)): Array[Double] = {
         val newacc: Array[Double] = acc
         for ((quant, pos) <- QUINT.zipWithIndex) {
@@ -67,5 +89,3 @@ package main.scala {
       ecdf.aggregate(Array.fill[Double](QUINT.length)(0))((acc, value) => dqSeqOp(acc, value), (acc1, acc2) => dqCombOp(acc1, acc2))
     }
   }
-
-}

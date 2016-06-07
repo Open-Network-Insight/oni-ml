@@ -6,7 +6,8 @@ package main.scala {
 
   import testutils.TestingSparkContextFlatSpec
   import org.scalatest.Matchers
-  import main.scala.Quantiles
+  import org.opennetworkinsight.Quantiles
+
 
   class QuantilesTest extends TestingSparkContextFlatSpec with Matchers {
 
@@ -17,7 +18,7 @@ package main.scala {
 
     "ecdf" should "on a constant list" in {
       val rddIn = sparkContext.parallelize(allOnes)
-      val rddOut = Quantiles.compute_ecdf(rddIn)
+      val rddOut = Quantiles.computeEcdf(rddIn)
 
       val out = rddOut.collect()
 
@@ -27,7 +28,7 @@ package main.scala {
 
     "ecdf" should "on a split 50/50 list" in {
       val rddIn = sparkContext.parallelize(onesAndTwos)
-      val rddOut = Quantiles.compute_ecdf(rddIn)
+      val rddOut = Quantiles.computeEcdf(rddIn)
 
       val out = rddOut.collect()
 
@@ -38,7 +39,7 @@ package main.scala {
 
     "ecdf" should "on count-to-ten list" in {
       val rddIn = sparkContext.parallelize(countToTen)
-      val rddOut = Quantiles.compute_ecdf(rddIn)
+      val rddOut = Quantiles.computeEcdf(rddIn)
 
       val out = rddOut.collect()
 
@@ -53,18 +54,6 @@ package main.scala {
       out(7) shouldBe (8.0, 0.8)
       out(8) shouldBe (9.0, 0.9)
       out(9) shouldBe (10.0, 1.0)
-    }
-
-    "distributed_quantiles" should "on a split 50/50 list" in {
-      val rddIn = sparkContext.parallelize(onesAndTwos)
-      val quantile_cutoffs = Array(0.0, 0.6)
-      val quantiles_out = Quantiles.distributed_quantiles(quantile_cutoffs, Quantiles.compute_ecdf(rddIn))
-
-
-      quantiles_out.length shouldBe 2
-      quantiles_out(0) shouldBe 0.0
-      quantiles_out(1) shouldBe 1.0
-
     }
   }
 
