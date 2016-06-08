@@ -1,13 +1,30 @@
 #!/bin/bash
 
 # read in variables (except for date) from etc/.conf file
-
 FDATE=$1
-YR=$2
-MH=$3
-DY=$4
-DSOURCE=$5
-TOL=$6
+DSOURCE=$2
+TOL=$3
+YR=${FDATE:0:4}
+MH=${FDATE:4:2}
+DY=${FDATE:6:2}
+
+# checking for required arguments
+if [[ "${#FDATE}" != "8" || -z "${DSOURCE}" ]]; then
+    echo "ml_ops.sh syntax error"
+    echo "Please run ml_ops.sh again with the correct syntax:"
+    echo "./ml_ops.sh YYYYMMDD TYPE [TOL]"
+    echo "for example:"
+    echo "./ml_ops.sh 20160122 dns 1e-6"
+    echo "./ml_ops.sh 20160122 flow"
+    exit
+fi
+
+# number of total processes for mpi
+PROCESS_COUNT=20
+
+##do not edit##
+TOPIC_COUNT=20
+###############
 
 # intermediate ML results go in hive directory
 DFOLDER='hive'
@@ -34,12 +51,10 @@ hadoop fs -rm -R ${HPATH}/lda_word_counts
 # move TDM to local file system
 # do we have to do a mkdir here?
 mkdir -p ${LPATH}
-rm -f ${LPATH}/*.{dat, beta, other, pkl} # protect the flow_scores.csv file
+rm -f ${LPATH}/*.{dat,beta,gamma,other,pkl} # protect the flow_scores.csv file
 
 #kinit -kt /etc/security/keytabs/smokeuser.headless.keytab <user-id>
 time spark-shell --master yarn-client --executor-memory  ${SPK_EXEC_MEM}  --driver-memory 2g --num-executors ${SPK_EXEC} --executor-cores 1 --conf spark.shuffle.io.preferDirectBufs=false --conf shuffle.service.enabled=true --conf spark.driver.maxResultSize="2g"  -i scala ${DSOURCE}_pre_lda.scala
-
-
 
 hadoop fs -copyToLocal  ${HPATH}/word_counts/part-* ${LPATH}/.
 cd ${LPATH}
@@ -62,8 +77,7 @@ do
 done
 sleep 2
 cd ${LDAPATH}
-PROCESS_COUNT=20
-time mpiexec -n ${PROCESS_COUNT} -f machinefile ./lda est 2.5 20 settings.txt ${PROCESS_COUNT} ../${FDATE}/model.dat random ../${FDATE}
+time mpiexec -n ${PROCESS_COUNT} -f machinefile ./lda est 2.5 ${TOPIC_COUNT} settings.txt ${PROCESS_COUNT} ../${FDATE}/model.dat random ../${FDATE}
 sleep 10
 
 cd ${LUSER}/ml
