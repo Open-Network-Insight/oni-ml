@@ -6,36 +6,65 @@ At present, oni-ml contains routines for performing *suspicious connections* ana
 analyses consume a (possibly very lage) collection of network events and produces a list of the events that considered to be the least probable (or most suspicious).
 
 oni-ml is designed to be run as a component of Open-Network-Insight. It relies on the ingest component of Open-Network-Insight to collect and load
-netflow and DNS records, and oni-ml will try to load data to the operational analytics component of Open-Network-Insight.
+netflow and DNS records, and oni-ml will try to load data to the operational analytics component of Open-Network-Insight.  It is strongly suggested that when experimenting with oni-ml, you do so as a part of the unified Open-Network-Insight system: Please see [the Open-Network-Insight wiki](https://github.com/Open-Network-Insight/open-network-insight/wiki)
 
-For installation and use of the Open-Network-Insight system, please see [the Open-Network-Insight wiki](https://github.com/Open-Network-Insight/open-network-insight/wiki)
-
-The remaining instructions in this README file treat oni-ml in a stand-alone fashion.
+The remaining instructions in this README file treat oni-ml in a stand-alone fashion that mayb be helpful for customizing and troubleshooting the
+component.
 
 ## Getting Started
 
 
 
-### Prerequisites
+### Prerequisites, Installation and Configuration
 
-Running oni-ml requires:
+Install and configure oni-ml as a part of the Open-Network-Insight project, per the instruction at
+[the Open-Network-Insight wiki](https://github.com/Open-Network-Insight/open-network-insight/wiki).
 
-1. A Hadoop cluster running HDFS, Yarn, and Apache Spark 1.3 (or higher) in Yarn mode. Deploying a Hadoop cluster is out the scope of this README, but we test with [the Cloudera Distribution of Hadoop](http://www.cloudera.com/downloads/cdh/5-7-1.html)
-2. A build of [oni-lda-c](https://github.com/Open-Network-Insight/oni-lda-c) in a folder called oni-lda-c immediately below the directory from which you will install oni-ml.
-3. Python 2.x, installed on the machine from which oni-ml be run. See [https://www.python.org](https://www.python.org) for installation information.
+Names and language that we will use from the configuration variables for Open-Network-Insight (that are set in the file [duxbay.conf](https://github.com/Open-Network-Insight/oni-setup/blob/1.0.1/duxbay.conf))
 
-
-###  Configuration
+- MLNODE the node from which the oni-ml routines are invoked
+- NODES the list of MPI worker nodes that execute the topic modelling analysis
+- LDAPATH path of the *directory* containing the executable `lda` built from oni-lda-c
+- LPATH The local path for the ML intermediate and final results, dynamically created and populated when the pipeline runs
+- HPATH Location for storing intermediate results of the analysis on HDFS.
 
 
 ### Prepare data for input 
 
 
-### Run a suspicous connects pipeline
+### Run a suspicous connects analysis
 
+To run a suspicious connects analysis, execute the  `ml_ops.sh` script in the ml directory of the ML node.
+```
+./ml_ops.sh YYYMMDD <type> <suspicion threshold>
+```
 
-## oni-lda-c output
+For example:  
+```
+./ml_ops.sh 19731231 flow 1e-20
+```
+and
+```
+./ml_ops.sh 20150101 dns 1e-4
+```
+### oni-ml output
 
+A successful run of oni-ml will create and populate a directory at `LPATH/YYYYMMDD` where `YYYYMMDD` is the date argument provided to `ml_ops.sh`
+
+This directory will contain the following files:
+
+- flow_results.csv Network events annotated with estimated probabilities and sorted in ascending order.
+- doc_results.csv  The per-document topic-mix scores. Each line represents the topic mix of a document. First entry is the document (an IP), and this is separated from the remaineder by a comma. The remainder is a space-separated list of floating point numbers that sums to 1.0. The number at position k is the fraction of the document assigned to topic k.
+- word_results.csv The per-word probability by topic scores. Each line represent the conditional probabilities of a word. First entry is the word (a summarized network event), and this is separated from the remainder by a comma. The remainder of the line is a space-separated list of floating-point numbers. The number at position k is the probability of seeing this word conditioned on being in topic k.
+- doc.dat An intermediate file mapping integers to IP addresses.
+- words.dat An intermediate file mapping integers to the network event "words"
+- model.dat An intermediate file in which each line corresponds to a "document" (an IP pair or DNS client), and contains the size of the document and the list of "words" (simplified network events) occurring in the document with their frequencies. Words are encoded as integers per the file words.dat. 
+- final.beta  A space-separated text file that contains the logs of the probabilities of each word given each topic. Each line corresponds to a topic and the words are columns. 
+- final.gamma A space-separated text file that contains the unnormalized probabilities of each topic given each document. Each line corresponds to a document and the topics are the columns.
+- final.other  Auxilliary information from the LDA run: Number of topics, number of terms, alpha.
+- likelihood.dat Convergence information for the LDA run.
+
+In addition, on each MPI worker node, in the `LPATH/YYYYMMDD` directory files of the form `<worker index>.beta` and `<workder index>.gamma`, these are local temporary files that are combined to form `final.beta` and `final.gamma`, respectively.
 
 ## Licensing
 
@@ -50,7 +79,6 @@ Create a pull request and contact the maintainers.
 Report issues at the [OpenNetworkInsight issues page](https://github.com/Open-Network-Insight/open-network-insight/issues).
 
 ## Maintainers
-
 
 [Ricardo Barona](https://github.com/rabarona)
 
