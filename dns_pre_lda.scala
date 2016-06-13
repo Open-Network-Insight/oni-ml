@@ -5,8 +5,8 @@ val sqlContext = new org.apache.spark.sql.SQLContext(sc)
 import org.apache.spark.sql.types._
 import org.apache.spark.storage.StorageLevel
 import org.apache.spark.mllib.linalg.Vectors
+import sqlContext.implicits._
 import breeze.stats.DescriptiveStats._
-//import breeze.linalg._
 import org.apache.log4j.Logger
 import org.apache.log4j.Level
 import scala.math._
@@ -38,18 +38,6 @@ def print_lines(input: org.apache.spark.rdd.RDD[String]) = input.take(10).foreac
 
 def print_rdd(input: org.apache.spark.rdd.RDD[Array[String]]) = input.take(20).foreach(m => println(m.mkString(",") ))
 
-/**
-def bin_column(row: Array[String], column: String, cuts: Array[Double]) = {
-    var bin = 0
-    for (cut <- cuts){
-        if (row(col(column)).toDouble > cut) { bin = bin+1 }
-    }
-    col(column + "_bin") = row.length + 1   //update the column index automatically
-    row :+ bin.toString
-}
-*/
-
-
 def isNumeric(input: String): Boolean = {
     if (input == "") {false}
     else {input.forall(x => (x.isDigit || x == '.' || x =='E' || x == 'e')) && input.count(_ == '.')<2 && (input.count(_ == 'E') + input.count(_ == 'e')) <2}
@@ -58,8 +46,8 @@ def toDouble(s: String, default:Double=Double.NaN) = {if (isNumeric(s)) s.toDoub
 
 
 val file_list = System.getenv("DNS_PATH")
-val feedback_file = "None"
-val duplication_factor = 100
+val feedback_file = System.getenv("LPATH") + "/dns_scores.csv"
+val duplication_factor = System.getenv("DUPFACTOR").toInt
 val outputfile = System.getenv("HPATH")  + "/word_counts"
 val quant = Array(0, 0.1,0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9)
 val quint = Array(0, 0.2, 0.4, 0.6, 0.8)
@@ -78,53 +66,101 @@ val l_top_domains = Source.fromFile("top-1m.csv").getLines.map(line => {
                     }).toSet
 val top_domains = sc.broadcast(l_top_domains)
 
-/**
-val file_list = System.getenv("DPATH")    //This can be one file or many file pathes separated by commas
-val domain_table = System.getenv("DOMAIN_TABLE")
-val feedback_file = System.getenv("FPATH")
-val duplication_factor = System.getenv("DUPFACTOR").toInt
-val output_file = System.getenv("HPATH") + "/dns_word_counts"
-val output_file_for_lda = System.getenv("HPATH") + "/dns_lda_word_counts"
-*/
+case class Feedback(frameTime: String,
+                        unixTimeStamp: String,
+                        frameLen: Int,
+                        ipDst: String,
+                        dnsQryName: String,
+                        dnsQryClass: String,
+                        dnsQryType: String,
+                        dnsQryRcode: String,
+                        dnsSev: Int)
+val scoredFileExists = new java.io.File(feedback_file).exists
 
-//-----------------------------
+val falsePositives : org.apache.spark.rdd.RDD[String]  = if (scoredFileExists){
 
-var multidata = {
+    /* dns_scores.csv - feedback file structure
+    
+    0   frame_time             object
+    1   frame_len              object
+    2   ip_dst                 object
+    3   dns_qry_name           object
+    4   dns_qry_class           int64
+    5   dns_qry_type            int64
+    6   dns_qry_rcode           int64
+    7   domain                 object
+    8   subdomain              object
+    9   subdomain_length        int64
+    10  num_periods             int64
+    11  subdomain_entropy     float64
+    12  top_domain              int64
+    13  word                   object
+    14  score                 float64
+    15  query_rep              object
+    16  hh                      int64
+    17  ip_sev                  int64
+    18  dns_sev                 int64
+    19  dns_qry_class_name     object
+    20  dns_qry_type_name      object
+    21  dns_qry_rcode_name     object
+    22  network_context       float64
+    23  unix_tstamp             
+    */    
+    val FrameTimeIndex = 0
+    val UnixTimeStampIndex = 23
+    val FrameLenIndex = 1
+    val IpDstIndex = 2
+    val DnsQryNameIndex = 3
+    val DnsQryClassIndex = 4
+    val DnsQryTypeIndex = 5
+    val DnsQryRcodeIndex = 6
+    val DnsSevIndex = 18
+
+    /**
+    * Calling drop(1) to remove file header.
+     */
+    val lines = Source.fromFile(feedback_file).getLines().toArray.drop(1)
+    val feedback : org.apache.spark.rdd.RDD[String] = sc.parallelize(lines)
+    val feedbackDataFrame = feedback.map(_.split(",")).map(row => Feedback(row(FrameTimeIndex),
+        row(UnixTimeStampIndex),
+        row(FrameLenIndex).trim.toInt,
+        row(IpDstIndex),
+        row(DnsQryNameIndex),
+        row(DnsQryClassIndex),
+        row(DnsQryTypeIndex),
+        row(DnsQryRcodeIndex),
+        row(DnsSevIndex).trim.toInt )).toDF()
+    val result = feedbackDataFrame.filter("dnsSev = 3").select("frameTime","unixTimeStamp","frameLen", "ipDst",
+        "dnsQryName", "dnsQryClass", "dnsQryType", "dnsQryRcode").map(_.mkString(","))
+    val toDuplicate : org.apache.spark.rdd.RDD[String] = result.flatMap(x => List.fill(duplication_factor)(x))
+    toDuplicate
+} else{
+        null
+}
+
+val multidata = {
     var df = sqlContext.parquetFile( file_list.split(",")(0) ).filter("frame_len is not null and unix_tstamp is not null")
     val files = file_list.split(",")
     for ( (file, index) <- files.zipWithIndex){
         if (index > 1) {
-	    df = df.unionAll(sqlContext.parquetFile(file).filter("frame_len is not null and unix_tstamp is not null"))
-	}
+            df = df.unionAll(sqlContext.parquetFile(file).filter("frame_len is not null and unix_tstamp is not null"))
+        }
     }
     df =  df.select("frame_time","unix_tstamp","frame_len", "ip_dst", "dns_qry_name", "dns_qry_class", "dns_qry_type", "dns_qry_rcode")
     df_cols = df.columns
-    val tempRDD: org.apache.spark.rdd.RDD[String] = df.map(_.mkString(",")) 
-    tempRDD
+    df.map(_.mkString(","))
 }
 
-var rawdata :org.apache.spark.rdd.RDD[String] = {
-    if (feedback_file == "None") { multidata
+val rawdata :org.apache.spark.rdd.RDD[String] = {
+    if (!scoredFileExists) { multidata
     }else {
-        var data :org.apache.spark.rdd.RDD[String] = multidata
-        val feedback :org.apache.spark.rdd.RDD[String] = sc.textFile(feedback_file)
-        val falsepositives = feedback.filter(line => line.split(",").last == "3")
-        var i = 1
-        while (i < duplication_factor) {
-            data = data.union(falsepositives)
-            i = i+1
-        }
-    data        
+        multidata.union(falsePositives)
     }
 }
 
-// only needed if the schema is different than the standard solution setup
-//val indices: Array[Int] = Array(0,1,2,3,4,5,6,7,8)
-//rawdata = rawdata.map(line => line.split(",")).map(inner => indices.map(inner).mkString(","))
 
-//print_lines(rawdata)
 println(rawdata.count())
-var col = get_column_names(df_cols)
+val col = get_column_names(df_cols)
 
 def addcol(colname: String) = if (!col.keySet.exists(_==colname) ){col(colname) = col.values.max+1}
 if (feedback_file != "None") { addcol("feedback") }

@@ -100,7 +100,7 @@ hadoop fs -put ${LPATH}/word_results.csv ${HPATH}/.
 hadoop fs -rm -R -f ${HPATH}/word_counts
 hadoop fs -rm -R -f ${HPATH}/scored
 
-if [ $6 != '' ]; then TOL=$6 ; fi
+if [ -n "$3" ]; then TOL=$3 ; fi
 export TOL
 
 
