@@ -75,7 +75,7 @@ DNS data for the year YEAR, month MONTH and day DAY is stored in Hive at `HUSER/
 
 The Hive tables containing DNS data for oni-ml analyses have the following schema:
 
-1. frame_time: STRING
+0. frame_time: STRING
 2. unix_tstamp: BIGINT
 3. frame_len: INT
 4. ip_dst: STRING
