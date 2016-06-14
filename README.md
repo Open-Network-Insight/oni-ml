@@ -74,6 +74,7 @@ Data for oni-ml netflow analyses is currently stored in text csv files using the
 DNS data for the year YEAR, month MONTH and day DAY is stored in Hive at `HUSER/dns/hive/y=YEAR/m=MONTH/d=DAY/`
 
 The Hive tables containing DNS data for oni-ml analyses have the following schema:
+
 1. frame_time: STRING
 2. unix_tstamp: BIGINT
 3. frame_len: INT
