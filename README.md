@@ -22,19 +22,72 @@ Install and configure oni-ml as a part of the Open-Network-Insight project, per 
 
 Names and language that we will use from the configuration variables for Open-Network-Insight (that are set in the file [duxbay.conf](https://github.com/Open-Network-Insight/oni-setup/blob/1.0.1/duxbay.conf))
 
-- MLNODE the node from which the oni-ml routines are invoked
-- NODES the list of MPI worker nodes that execute the topic modelling analysis
-- LDAPATH path of the *directory* containing the executable `lda` built from oni-lda-c
+- MLNODE The node from which the oni-ml routines are invoked
+- NODES The list of MPI worker nodes that execute the topic modelling analysis
+- HUSER An HDFS user path that will be the base path for the solution; this is usually the same user that you created to run the solution
 - LPATH The local path for the ML intermediate and final results, dynamically created and populated when the pipeline runs
 - HPATH Location for storing intermediate results of the analysis on HDFS.
 
 
 ### Prepare data for input 
 
+Load data for consumption by oni-ml by running [oni-ingest](https://github.com/Open-Network-Insight/oni-ingest/tree/1.0.1).
+
+The data format and location where the data is stored differs for netflow and DNS analyses.
+
+**Netflow Data**
+
+Netflow data for the year YEAR, month  MONTH, and day DAY is stored in HDFS at `HUSER/flow/csv/y=YEAR/m=MONTH/d=DAY/*`
+
+Data for oni-ml netflow analyses is currently stored in text csv files using the following schema zero-indexed columns:
+
+0. time: String
+1. year: Double
+2. month: Double
+3. day: Double
+4. hour: Double
+5. minute: Double
+6. second: Double
+7. time of duration: Double
+8. source IP: String
+9. destination IP: String
+10. source port: Double
+11. dport: Double
+12. proto: String
+13. flag: String
+14. fwd: Double
+15. stos: Double
+16. ipkt: Double.
+17. ibyt: Double
+18. opkt: Double
+19. obyt: Double
+20. input: Double
+21. output: Double
+22. sas: String
+23. das: Sring
+24. dtos: String
+25. dir: String
+26. rip: String
+
+**DNS Data**
+
+DNS data for the year YEAR, month MONTH and day DAY is stored in Hive at `HUSER/dns/hive/y=YEAR/m=MONTH/d=DAY/`
+
+The Hive tables containing DNS data for oni-ml analyses have the following schema:
+1. frame_time: STRING
+2. unix_tstamp: BIGINT
+3. frame_len: INT
+4. ip_dst: STRING
+5. ip_src: STRING
+6. dns_qry_name: STRING
+7. dns_qry_class: STRING
+8. dns_qry_type: INT
+9. dns_qry_rcode: INT
+10. dns_a: STRING
 
 ### Run a suspicous connects analysis
 
-To run a suspicious connects analysis, execute the  `ml_ops.sh` script in the ml directory of the ML node.
+To run a suspicious connects analysis, execute the  `ml_ops.sh` script in the ml directory of the MLNODE.
 ```
 ./ml_ops.sh YYYMMDD <type> <suspicion threshold>
 ```
@@ -64,7 +117,7 @@ This directory will contain the following files:
 - final.other  Auxilliary information from the LDA run: Number of topics, number of terms, alpha.
 - likelihood.dat Convergence information for the LDA run.
 
-In addition, on each MPI worker node, in the `LPATH/YYYYMMDD` directory files of the form `<worker index>.beta` and `<workder index>.gamma`, these are local temporary files that are combined to form `final.beta` and `final.gamma`, respectively.
+In addition, on each worker node identified in NODES, in the `LPATH/YYYYMMDD` directory files of the form `<worker index>.beta` and `<workder index>.gamma`, these are local temporary files that are combined to form `final.beta` and `final.gamma`, respectively.
 
 ## Licensing
 
@@ -85,4 +138,3 @@ Report issues at the [OpenNetworkInsight issues page](https://github.com/Open-Ne
 [Nathan Segerlind](https://github.com/NathanSegerlind)
 
 [Everardo Lopez Sandoval](https://github.com/EverLoSa)
-
