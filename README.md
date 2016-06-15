@@ -86,7 +86,7 @@ The Hive tables containing DNS data for oni-ml analyses have the following schem
 9. dns_qry_rcode: INT
 10. dns_a: STRING
 
-### Run a suspicous connects analysis
+### Run a suspicious connects analysis
 
 To run a suspicious connects analysis, execute the  `ml_ops.sh` script in the ml directory of the MLNODE.
 ```
@@ -108,7 +108,7 @@ A successful run of oni-ml will create and populate a directory at `LPATH/YYYYMM
 This directory will contain the following files:
 
 - flow_results.csv Network events annotated with estimated probabilities and sorted in ascending order.
-- doc_results.csv  The per-document topic-mix scores. Each line represents the topic mix of a document. First entry is the document (an IP), and this is separated from the remaineder by a comma. The remainder is a space-separated list of floating point numbers that sums to 1.0. The number at position k is the fraction of the document assigned to topic k.
+- doc_results.csv  The per-document topic-mix scores. Each line represents the topic mix of a document. First entry is the document (an IP), and this is separated from the remainder by a comma. The remainder is a space-separated list of floating point numbers that sums to 1.0. The number at position k is the fraction of the document assigned to topic k.
 - word_results.csv The per-word probability by topic scores. Each line represent the conditional probabilities of a word. First entry is the word (a summarized network event), and this is separated from the remainder by a comma. The remainder of the line is a space-separated list of floating-point numbers. The number at position k is the probability of seeing this word conditioned on being in topic k.
 - doc.dat An intermediate file mapping integers to IP addresses.
 - words.dat An intermediate file mapping integers to the network event "words"
