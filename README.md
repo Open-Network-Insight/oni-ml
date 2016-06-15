@@ -8,7 +8,7 @@ analyses consume a (possibly very lage) collection of network events and produce
 oni-ml is designed to be run as a component of Open-Network-Insight. It relies on the ingest component of Open-Network-Insight to collect and load
 netflow and DNS records, and oni-ml will try to load data to the operational analytics component of Open-Network-Insight.  It is strongly suggested that when experimenting with oni-ml, you do so as a part of the unified Open-Network-Insight system: Please see [the Open-Network-Insight wiki](https://github.com/Open-Network-Insight/open-network-insight/wiki)
 
-The remaining instructions in this README file treat oni-ml in a stand-alone fashion that maybe be helpful for customizing and troubleshooting the
+The remaining instructions in this README file treat oni-ml in a stand-alone fashion that might be helpful for customizing and troubleshooting the
 component.
 
 ## Getting Started
