@@ -60,7 +60,7 @@ if topics:
 			if j % 1000000 == 0:
 				print j,"rows processed"
 			j += 1
-
+        	f.close()
 	print "Saved topic distribution in doc_results.csv"
 			#np.savetxt('doc_results.csv', doc_topics, delimiter=",", fmt="%s")
 
@@ -120,4 +120,4 @@ if words:
 		f.write(line1)
 		line = str(format % (tuple(p_wgz[j]) ) ).encode('ascii')
 		f.write(line)
-
+	f.close()
