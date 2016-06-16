@@ -54,7 +54,7 @@ mkdir -p ${LPATH}
 rm -f ${LPATH}/*.{dat,beta,gamma,other,pkl} # protect the flow_scores.csv file
 
 #kinit -kt /etc/security/keytabs/smokeuser.headless.keytab <user-id>
-time spark-shell --master yarn-client --executor-memory  ${SPK_EXEC_MEM}  --driver-memory 2g --num-executors ${SPK_EXEC} --executor-cores 1 --conf spark.shuffle.io.preferDirectBufs=false --conf shuffle.service.enabled=true --conf spark.driver.maxResultSize="2g"  -i scala ${DSOURCE}_pre_lda.scala
+time spark-submit --class "org.opennetworkinsight.Dispatcher" --master yarn-client --executor-memory  ${SPK_EXEC_MEM}  --driver-memory 2g --num-executors ${SPK_EXEC} --executor-cores 1 --conf spark.shuffle.io.preferDirectBufs=false --conf shuffle.service.enabled=true --conf spark.driver.maxResultSize="2g"   target/scala-2.10/oni-ml_2.10-1.1.jar ${DSOURCE}_pre_lda
 
 hadoop fs -copyToLocal  ${HPATH}/word_counts/part-* ${LPATH}/.
 cd ${LPATH}
@@ -105,7 +105,9 @@ export TOL
 
 
 #kinit -kt /etc/security/keytabs/smokeuser.headless.keytab <user-id>
-time spark-shell --master yarn-client --executor-memory  ${SPK_EXEC_MEM}  --driver-memory 2g --num-executors ${SPK_EXEC} --executor-cores 1 --conf spark.shuffle.io.preferDirectBufs=false --conf shuffle.service.enabled=true --conf spark.driver.maxResultSize="2g"  -i scala ${DSOURCE}_post_lda.scala
+
+time spark-submit --class "org.opennetworkinsight.Dispatcher" --master yarn-client --executor-memory  ${SPK_EXEC_MEM}  --driver-memory 2g --num-executors ${SPK_EXEC} --executor-cores 1 --conf spark.shuffle.io.preferDirectBufs=false --conf shuffle.service.enabled=true --conf spark.driver.maxResultSize="2g" target/scala-2.10/oni-ml_2.10-1.1.jar ${DSOURCE}_post_lda
+
 
 hadoop fs -copyToLocal ${HPATH}/scored/part-* ${LPATH}/.
 
