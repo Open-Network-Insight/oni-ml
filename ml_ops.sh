@@ -77,7 +77,8 @@ do
 done
 sleep 2
 cd ${LDAPATH}
-time mpiexec -n ${PROCESS_COUNT} -f machinefile ./lda est 2.5 ${TOPIC_COUNT} settings.txt ${PROCESS_COUNT} ../${FDATE}/model.dat random ../${FDATE}
+${MPI_PREP_CMD}
+time ${MPI_CMD} -n ${PROCESS_COUNT} -f machinefile ./lda est 2.5 ${TOPIC_COUNT} settings.txt ${PROCESS_COUNT} ../${FDATE}/model.dat random ../${FDATE}
 sleep 10
 
 cd ${LUSER}/ml
