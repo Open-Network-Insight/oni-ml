@@ -30,11 +30,6 @@ source /etc/duxbay.conf
 if [ -n "$3" ]; then TOL=$3 ; fi
 
 
-# number of total processes for MPI... EDIT THIS!
-
-PROCESS_COUNT=20
-
-
 # prepare parameters pipeline stages
 
 if [ "$DSOURCE" == "flow" ]; then
