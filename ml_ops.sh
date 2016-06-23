@@ -102,9 +102,12 @@ done
 wait
 
 cd ${LDAPATH}
-time mpiexec -n ${PROCESS_COUNT} -f machinefile ./lda est 2.5 ${TOPIC_COUNT} settings.txt \
+
+${MPI_PREP_CMD}
+time ${MPI_CMD} -n ${PROCESS_COUNT} -f machinefile ./lda est 2.5 ${TOPIC_COUNT} settings.txt \
   ${PROCESS_COUNT} ../${LDA_OUTPUT_DIR}/model.dat random ../${LDA_OUTPUT_DIR}
 wait
+
 
 cd ${LUSER}/ml
 time python lda_post.py ${LPATH}/
