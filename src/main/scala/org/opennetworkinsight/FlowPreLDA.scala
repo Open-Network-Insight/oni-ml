@@ -4,6 +4,7 @@ package org.opennetworkinsight
 import org.apache.log4j.{Level, Logger => apacheLogger}
 import org.apache.spark.rdd.RDD
 import org.apache.spark.{SparkConf, SparkContext}
+import org.apache.spark.sql.SQLContext
 import org.slf4j.LoggerFactory
 import org.opennetworkinsight.{FlowColumnIndex => indexOf}
 
@@ -57,6 +58,7 @@ object FlowPreLDA {
 
           val conf = new SparkConf().setAppName("ONI ML: flow pre lda")
           val sc = new SparkContext(conf)
+          val sqlContext = new SQLContext(sc)
 
           val scoredFile = config.scoresFile
           logger.info("scoredFile:  " + scoredFile)
@@ -171,8 +173,22 @@ object FlowPreLDA {
           }
 
           logger.info("Trying to read file:  " + config.inputPath)
-          val rawdata: RDD[String] = sc.textFile(config.inputPath)
-          val datanoheader: RDD[String] = FlowWordCreation.removeHeader(rawdata)
+          val rawdata: RDD[String] = {
+            val flowDataFrame = sqlContext.parquetFile(config.inputPath)
+              .filter("trhour BETWEEN 0 AND 23 AND  " +
+                "trminute BETWEEN 0 AND 59 AND  " +
+                "trsec BETWEEN 0 AND 59")
+              .select("trhour",
+                "trminute",
+                "trsec",
+                "sip",
+                "dip",
+                "sport",
+                "dport",
+                "ipkt",
+                "ibyt")
+            flowDataFrame.map(_.mkString(","))
+          }
 
           val scoredFileExists =  if (scoredFile != "") new java.io.File(scoredFile).exists else false
 
@@ -188,11 +204,9 @@ object FlowPreLDA {
             Array[String]()
           }
 
-          val totalData: RDD[String] = datanoheader.union(sc.parallelize(scoredData))
+          val totalData: RDD[String] = rawdata.union(sc.parallelize(scoredData))
 
-          val datagood: RDD[String] = totalData.filter(line => line.split(",").length == 27)
-
-          val data_with_time = datagood.map(_.trim.split(',')).map(FlowWordCreation.addTime)
+          val data_with_time = totalData.map(_.trim.split(',')).map(FlowWordCreation.addTime)
 
           logger.info("calculating time cuts ...")
           time_cuts = Quantiles.computeDeciles(data_with_time.map(row => row(indexOf.NUMTIME).toDouble))
@@ -201,7 +215,7 @@ object FlowPreLDA {
           ibyt_cuts = Quantiles.computeDeciles(data_with_time.map(row => row(indexOf.IBYT).toDouble))
           logger.info(ibyt_cuts.mkString(","))
           logger.info("calculating pkt cuts")
-          ipkt_cuts = Quantiles.computeQuintiles(data_with_time.map(row => row(16).toDouble))
+          ipkt_cuts = Quantiles.computeQuintiles(data_with_time.map(row => row(indexOf.IPKT).toDouble))
           logger.info(ipkt_cuts.mkString(","))
 
           val binned_data = data_with_time.map(row => FlowWordCreation.binIbytIpktTime(row, ibyt_cuts, ipkt_cuts, time_cuts))
