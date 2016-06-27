@@ -2,8 +2,10 @@ package org.opennetworkinsight
 
 import breeze.linalg._
 import org.apache.log4j.{Level, Logger => apacheLogger}
+import org.apache.spark.rdd.RDD
 import org.apache.spark.storage.StorageLevel
 import org.apache.spark.{SparkConf, SparkContext}
+import org.apache.spark.sql.SQLContext
 import org.opennetworkinsight.FlowPreLDA.Config
 import org.slf4j.LoggerFactory
 import org.opennetworkinsight.{FlowColumnIndex => indexOf}
@@ -58,6 +60,7 @@ object FlowPostLDA {
 
         val conf = new SparkConf().setAppName("ONI ML: flow post lda")
         val sc = new SparkContext(conf)
+        val sqlContext = new SQLContext(sc)
 
         var ibyt_cuts = new Array[Double](10)
         var ipkt_cuts = new Array[Double](5)
@@ -86,12 +89,24 @@ object FlowPostLDA {
         val words = sc.broadcast(l_words)
 
         logger.info("loading data")
-        val rawdata = sc.textFile(config.inputPath)
+        val rawdata: RDD[String] = {
+          val flowDataFrame = sqlContext.parquetFile(config.inputPath)
+            .filter("trhour BETWEEN 0 AND 23 AND  " +
+              "trminute BETWEEN 0 AND 59 AND  " +
+              "trsec BETWEEN 0 AND 59")
+            .select("trhour",
+              "trminute",
+              "trsec",
+              "sip",
+              "dip",
+              "sport",
+              "dport",
+              "ipkt",
+              "ibyt")
+          flowDataFrame.map(_.mkString(","))
+        }
 
-        val datanoheader = FlowWordCreation.removeHeader(rawdata)
-        val datagood = datanoheader.filter(line => line.split(",").length == 27)
-
-        val data_with_time = datagood.map(_.trim.split(",")).map(FlowWordCreation.addTime)
+        val data_with_time = rawdata.map(_.trim.split(",")).map(FlowWordCreation.addTime)
 
         logger.info("calculating time cuts ...")
         time_cuts = Quantiles.computeDeciles(data_with_time.map(row => row(indexOf.NUMTIME).toDouble))

@@ -39,8 +39,8 @@ object FlowWordCreation {
       var word_port = 111111.0
       val sip = row(FlowColumnIndex.SOURCEIP)
       val dip = row(FlowColumnIndex.DESTIP)
-      val dport = row(FlowColumnIndex.SOURCEPORT).toDouble
-      val sport = row(FlowColumnIndex.DESTPORT).toDouble
+      val dport = row(FlowColumnIndex.DESTPORT).toDouble
+      val sport = row(FlowColumnIndex.SOURCEPORT).toDouble
       val ipkt_bin = row(FlowColumnIndex.IPKTYBIN).toDouble
       val ibyt_bin = row(FlowColumnIndex.IBYTBIN).toDouble
       val time_bin = row(FlowColumnIndex.TIMEBIN).toDouble
