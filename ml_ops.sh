@@ -92,7 +92,8 @@ wait
 for d in "${NODES[@]}" 
 do 
 	echo "copying $d ${LPATH} ${LUSER}"
-	scp -r ${LPATH} $d:${LUSER}/ml/.    
+	ssh $d 'mkdir '"'${LUSER}'"'/ml/'"'${DSOURCE}'"
+	scp -r ${LPATH} $d:${LUSER}/ml/${DSOURCE}/.
 done
 wait
 
