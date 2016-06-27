@@ -110,4 +110,4 @@ time spark-submit --class "org.opennetworkinsight.Dispatcher" --master yarn-clie
 
 # move results to hdfs.
 cd ${LPATH}
-hadoop fs -getmerge  ${HPATH}/scored/part-* ${DSOURCE}_results.csv && hadoop fs -put ${DSOURCE}_results.csv ${HPATH}/scored/${DSOURCE}_results.csv
+hadoop fs -getmerge  ${HPATH}/scored/part-* ${DSOURCE}_results.csv && hadoop fs -moveFromLocal ${DSOURCE}_results.csv ${HPATH}/scored/${DSOURCE}_results.csv
