@@ -108,18 +108,6 @@ export TOL
 
 time spark-submit --class "org.opennetworkinsight.Dispatcher" --master yarn-client --executor-memory  ${SPK_EXEC_MEM}  --driver-memory 2g --num-executors ${SPK_EXEC} --executor-cores 1 --conf spark.shuffle.io.preferDirectBufs=false --conf shuffle.service.enabled=true --conf spark.driver.maxResultSize="2g" target/scala-2.10/oni-ml_2.10-1.1.jar ${DSOURCE}_post_lda
 
-
-hadoop fs -copyToLocal ${HPATH}/scored/part-* ${LPATH}/.
-
+# move results to hdfs.
 cd ${LPATH}
-
-cat part-* > ${DSOURCE}_results.csv
-rm -f part-*
-
-#op ml stage         Ingest results_all_20150618.csv into suspicious connects front end
-source /etc/duxbay.conf
-
- #scp to UI node
- scp -r ${LPATH} ${UINODE}:${RPATH}
- 
-
+hadoop fs -getmerge  ${HPATH}/scored/part-* ${DSOURCE}_results.csv && hadoop fs -moveFromLocal ${DSOURCE}_results.csv ${HPATH}/scored/${DSOURCE}_results.csv
