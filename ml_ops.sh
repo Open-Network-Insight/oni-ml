@@ -82,7 +82,7 @@ rm -f part-*
 
 #   lda  stage
 
-cd ..
+cd ${LUSER}/ml
 time python lda_pre.py ${LPATH}/
 rm -f ${LPATH}/doc_wc.dat
 wait
