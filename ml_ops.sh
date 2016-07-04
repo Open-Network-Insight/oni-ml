@@ -55,7 +55,7 @@ LOCAL_WORDRESULTS=${LPATH}/word_results.csv
 
 HDFS_SCORED_CONNECTS=${HPATH}/scores
 
-LDA_OUTPUT_DIR=${FDATE}
+LDA_OUTPUT_DIR=${DSOURCE}/${FDATE}
 
 TOPIC_COUNT=20
 
@@ -82,7 +82,7 @@ rm -f part-*
 
 #   lda  stage
 
-cd ..
+cd ${LUSER}/ml
 time python lda_pre.py ${LPATH}/
 rm -f ${LPATH}/doc_wc.dat
 wait
