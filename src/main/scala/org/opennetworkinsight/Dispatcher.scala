@@ -22,8 +22,9 @@ object Dispatcher {
       f match {
         case "dns_post_lda" => DnsPostLDA.run(args)
         case "dns_pre_lda" => DnsPreLDA.run(args)
-        case "flow_post_lda" =>FlowPostLDA.run(args)
-        case "flow_pre_lda" => FlowPreLDA.run(args)
+        //case "flow_post_lda" =>FlowPostLDA.run(args)
+        //case "flow_pre_lda" => FlowPreLDA.run(args)
+        case "flow_lda" => FlowLDA.run(args)
       }
 
       System.exit(0)

@@ -19,13 +19,17 @@ import scala.sys.process._
 
 object LDAWrapper {
 
-  def runLDA(docWordCount: RDD[Array[String]], modelFile, topicDocumentFile, topicWordFile, wordProbabilityFile,
-             mpiPreparationCmd, mpiCmd, mpiProcessCount, mpiTopicCount, ldaOutputPath)
-  = {
+  def runLDA(docWordCount: RDD[String], modelFile: String, topicDocumentFile: String, topicWordFile: String,
+             mpiPreparationCmd: String, mpiCmd: String, mpiProcessCount: String, mpiTopicCount: String,
+             ldaOutputPath: String, localPath: String, localUser: String, dataSource: String, nodes: String):
+  scala.collection.mutable.Map[String, Array[String]]
+  =
+  {
 
+    val documentWordData = docWordCount.map(_.split(","))
     // Create word Map Word,Index for further usage
     val wordDictionary: Map[String, Int] = {
-      val words = docWordCount
+      val words = documentWordData
         .cache
         .map(row => row(1))
         .distinct()
@@ -33,7 +37,7 @@ object LDAWrapper {
       words.zipWithIndex.toMap
     }
 
-    val distinctDocument = docWordCount.map(row => row(0)).distinct
+    val distinctDocument = documentWordData.map(row => row(0)).distinct
 
     // Create document Map Index, Document for further usage
     val documentDictionary: Map[Int, String] = {
@@ -47,14 +51,14 @@ object LDAWrapper {
 
     // Create model for MPI
     val model = {
-      val documentCount = docWordCount
+      val documentCount = documentWordData
         .map(row => row(0))
         .map(document => (document, 1))
         .reduceByKey(_ + _)
         .toArray
         .toMap
 
-      val wordIndexdocWordCount = docWordCount
+      val wordIndexdocWordCount = documentWordData
         .map(row => (row(0), wordDictionary(row(1)) + ":" + row(2)))
         .groupByKey()
         .map(x => (x._1, x._2.mkString(" ")))
@@ -70,15 +74,19 @@ object LDAWrapper {
 
     // Persis model.dat
     val modelWriter = new PrintWriter(new File(modelFile))
-    model foreach ((row) => modelWriter.write("%s\n".format(row)))
+    model foreach (row => modelWriter.write("%s\n".format(row)))
     modelWriter.close()
 
+    // Copy model.dat to each machinefile node
+    val nodeList = nodes.replace("(","").replace(")","").replace("'","").split(" ")
+    for (node <- nodeList){
+      sys.process.Process(Seq("ssh", node, "mkdir " + localUser + "/ml/" + dataSource)).!
+      sys.process.Process(Seq("scp", "-r", localPath, node + ":" + localUser + "/ml/" + dataSource )).!
+    }
+
     // Execute MPI
-    /*${MPI_PREP_CMD}
-    time ${MPI_CMD} -n ${PROCESS_COUNT} -f machinefile ./lda est 2.5 ${TOPIC_COUNT} settings.txt \
-      ${PROCESS_COUNT} ../${LDA_OUTPUT_DIR}/model.dat random ../${LDA_OUTPUT_DIR}
-    wait*/
-    var mpiPreparationCmdResult = mpiPreparationCmd.!!
+    if(mpiPreparationCmd != "" && mpiPreparationCmd != null)
+      stringToProcess(mpiPreparationCmd).!!
     val result = sys.process.Process(Seq(mpiCmd, "-n", mpiProcessCount, "-f", "machinefile", "./lda", "est", "2.5",
       mpiTopicCount, "settings.txt", mpiProcessCount, modelFile, "random", ldaOutputPath),
       new java.io.File("/home/duxbury/ml/oni-lda-c")).!!
@@ -123,6 +131,11 @@ object LDAWrapper {
     // Create word results
     val wordTopic = pwgz.zipWithIndex.map({ case (k, v) => indexWordDictionary(v) + "," + k.mkString(" ") })
 
+    val ldaResults = scala.collection.mutable.Map[String, Array[String]]()
+    ldaResults.put("document_results", documentTopic)
+    ldaResults.put("word_results", wordTopic)
+
+    ldaResults
   }
 
   def normalizeWord(wordProbability: String)

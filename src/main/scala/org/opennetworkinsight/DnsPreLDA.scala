@@ -6,7 +6,7 @@ import org.apache.spark.{SparkConf, SparkContext}
 import org.slf4j.LoggerFactory
 import org.apache.spark.sql.types._
 import org.apache.spark.storage.StorageLevel
-import org.opennetworkinsight.FlowPreLDA.Config
+import org.opennetworkinsight.FlowLDA.Config
 
 import scala.io.Source
 
