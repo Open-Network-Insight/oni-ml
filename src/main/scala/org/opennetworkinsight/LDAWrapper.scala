@@ -21,7 +21,7 @@ object LDAWrapper {
 
   def runLDA(docWordCount: RDD[String], modelFile: String, topicDocumentFile: String, topicWordFile: String,
              mpiPreparationCmd: String, mpiCmd: String, mpiProcessCount: String, mpiTopicCount: String,
-             ldaOutputPath: String, localPath: String, localUser: String, dataSource: String, nodes: String):
+             localPath: String, ldaPath: String, localUser: String, dataSource: String, nodes: String):
   scala.collection.mutable.Map[String, Array[String]]
   =
   {
@@ -88,8 +88,7 @@ object LDAWrapper {
     if(mpiPreparationCmd != "" && mpiPreparationCmd != null)
       stringToProcess(mpiPreparationCmd).!!
     val result = sys.process.Process(Seq(mpiCmd, "-n", mpiProcessCount, "-f", "machinefile", "./lda", "est", "2.5",
-      mpiTopicCount, "settings.txt", mpiProcessCount, modelFile, "random", ldaOutputPath),
-      new java.io.File("/home/duxbury/ml/oni-lda-c")).!!
+      mpiTopicCount, "settings.txt", mpiProcessCount, modelFile, "random", localPath), new java.io.File(ldaPath)).!!
 
     // Read topic info per document
 

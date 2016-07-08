@@ -14,53 +14,8 @@ import org.opennetworkinsight.{FlowColumnIndex => indexOf}
   */
 object FlowPostLDA {
 
-    case class Config(inputPath: String = "",
-                      docResultsPath: String = "",
-                      wordResultsPath: String = "",
-                      resultsFilePath: String = "",
-                      threshold: Double = 1.0d)
-
-    val parser = new scopt.OptionParser[Config]("FlowPostLDA") {
-
-      head("FlowPostLDA", "1.1")
-
-      opt[String]('i', "input").required().valueName("<hdfs path>").
-        action((x, c) => c.copy(inputPath = x)).
-        text("HDFS path to netflow records")
-
-      opt[String]('d', "doc_results").required().valueName("<hdfs path>").
-        action((x, c) => c.copy(docResultsPath = x)).
-        text("HDFS path for document results")
-
-      opt[String]('w', "word_results").required().valueName("<hdfs path>").
-        action((x, c) => c.copy(wordResultsPath = x)).
-        text("HDFS path for word results")
-
-      opt[String]('s', "scored_file").required().valueName("<hdfs path>").
-        action((x, c) => c.copy(resultsFilePath = x)).
-        text("HDFS path for scored connections")
-
-      opt[Double]('t', "threshold").required().valueName("float64").
-
-        action((x, c) => c.copy(threshold = x)).
-        text("probability threshold for declaring anomalies")
-    }
-
-
   def flowPostLDA(inputPath: String, resultsFilePath: String, threshold: Double, documentResults: Array[String],
                   wordResults: Array[String], sc: SparkContext, sqlContext: SQLContext, logger: Logger) = {
-    //    parser.parse(args.drop(1), Config()) match {
-    //
-    //      case Some(config) => {
-//    val logger = LoggerFactory.getLogger(this.getClass)
-//    apacheLogger.getLogger("org").setLevel(Level.OFF)
-//    apacheLogger.getLogger("akka").setLevel(Level.OFF)
-//
-//    logger.info("Flow post LDA starts")
-
-//    val conf = new SparkConf().setAppName("ONI ML: flow post lda")
-//    val sc = new SparkContext(conf)
-//    val sqlContext = new SQLContext(sc)
 
     var ibyt_cuts = new Array[Double](10)
     var ipkt_cuts = new Array[Double](5)
