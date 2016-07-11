@@ -178,15 +178,33 @@ object FlowPreLDA {
               .filter("trhour BETWEEN 0 AND 23 AND  " +
                 "trminute BETWEEN 0 AND 59 AND  " +
                 "trsec BETWEEN 0 AND 59")
-              .select("trhour",
+              .select("treceived",
+                "tryear",
+                "trmonth",
+                "trday",
+                "trhour",
                 "trminute",
                 "trsec",
+                "tdur",
                 "sip",
                 "dip",
                 "sport",
                 "dport",
+                "proto",
+                "flag",
+                "fwd",
+                "stos",
                 "ipkt",
-                "ibyt")
+                "ibyt",
+                "opkt",
+                "obyt",
+                "input",
+                "output",
+                "sas",
+                "das",
+                "dtos",
+                "dir",
+                "rip")
             flowDataFrame.map(_.mkString(","))
           }
 
