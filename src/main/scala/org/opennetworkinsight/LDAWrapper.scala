@@ -78,7 +78,7 @@ object LDAWrapper {
     modelWriter.close()
 
     // Copy model.dat to each machinefile node
-    val nodeList = nodes.replace("(","").replace(")","").replace("'","").split(" ")
+    val nodeList = nodes.replace("'","").split(",")
     for (node <- nodeList){
       sys.process.Process(Seq("ssh", node, "mkdir " + localUser + "/ml/" + dataSource)).!
       sys.process.Process(Seq("scp", "-r", localPath, node + ":" + localUser + "/ml/" + dataSource )).!

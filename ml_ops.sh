@@ -59,6 +59,9 @@ LDA_OUTPUT_DIR=${DSOURCE}/${FDATE}
 
 TOPIC_COUNT=20
 
+nodes=${NODES[0]}
+for n in "${NODES[@]:1}" ; do nodes+=",${n}"; done
+
 hdfs dfs -rm -R -f ${HDFS_WORDCOUNTS}
 wait
 
@@ -66,6 +69,11 @@ mkdir -p ${LPATH}
 rm -f ${LPATH}/*.{dat,beta,gamma,other,pkl} # protect the flow_scores.csv file
 
 hdfs dfs -rm -R -f ${HDFS_SCORED_CONNECTS}
+
+# Add -p <command> to execute pre MPI command.
+# Pre MPI command can be configured in /etc/duxbay.conf
+# In this script, after the line after -c ${MPI_CMD} add:
+# -p ${MPI_PREP_CMD}
 
 
 time spark-submit --class "org.opennetworkinsight.LDA" --master yarn-client --executor-memory  ${SPK_EXEC_MEM} \
@@ -78,14 +86,14 @@ time spark-submit --class "org.opennetworkinsight.LDA" --master yarn-client --ex
   -m ${LPATH}/model.dat \
   -o ${LPATH}/final.gamma \
   -w ${LPATH}/final.beta \
-  -c ${MPI_CMD} -p ${MPI_PREP_CMD} \
-  -t ${PROCESS_COUNT} \
-  -u ${TOPIC_COUNT} \
   -l ${LPATH} \
   -a ${LDAPATH} \
   -r ${LUSER} \
+  -c ${MPI_CMD}  \
+  -t ${PROCESS_COUNT} \
+  -u ${TOPIC_COUNT} \
   -s ${DSOURCE} \
-  -n ${NODES} \
+  -n ${nodes} \
   -h ${HDFS_SCORED_CONNECTS} \
   -e ${TOL}
 
@@ -95,4 +103,3 @@ wait
 cd ${LPATH}
 hadoop fs -getmerge ${HDFS_SCORED_CONNECTS}/part-* ${DSOURCE}_results.csv && hadoop fs -moveFromLocal \
     ${DSOURCE}_results.csv  ${HDFS_SCORED_CONNECTS}/${DSOURCE}_results.csv
-

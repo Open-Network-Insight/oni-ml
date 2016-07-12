@@ -17,7 +17,7 @@ object FlowLDA {
     // TODO persist docWordCount in MEMORY and DISK
     val ldaResult = LDAWrapper.runLDA(docWordCount, config.modelFile, config.topicDocumentFile, config.topicWordFile,
       config.mpiPreparationCmd, config.mpiCmd, config.mpiProcessCount, config.mpiTopicCount, config.localPath,
-      config.localUser, config.ldaPath, config.dataSource, config.nodes)
+      config.ldaPath, config.localUser,  config.dataSource, config.nodes)
 
     FlowPostLDA.flowPostLDA(config.inputPath, config.hdfsScoredConnect, config.threshold, ldaResult("document_results"),
       ldaResult("word_results"), sparkContext, sqlContext, logger)
