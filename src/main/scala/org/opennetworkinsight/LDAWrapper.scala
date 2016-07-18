@@ -1,11 +1,9 @@
 package org.opennetworkinsight
 
 import org.apache.spark.rdd.RDD
-import org.apache.spark.{SparkConf, SparkContext}
 import java.io.PrintWriter
 import java.io.File
 
-import scala.math
 import scala.io.Source._
 import scala.sys.process._
 
@@ -140,10 +138,10 @@ object LDAWrapper {
   def normalizeWord(wordProbability: String)
   = {
 
-    val topics: Array[Double] = wordProbability.trim().split(" ").map(_.toDouble).toArray
+    val topics: Array[Double] = wordProbability.trim().split(" ").map(_.toDouble)
     // calculate the exp of each element and return array
-    val rawWord: Array[Double] = topics.map(math.exp(_)).toArray
-    // sum all exponentials
+    val rawWord: Array[Double] = topics.map(math.exp(_))
+    // sum all exponential
     val sumRawWord = rawWord.sum
     // calculate normalized value for each element: for each each val => exp(val)/sum
     rawWord.map(_ / sumRawWord).toArray
