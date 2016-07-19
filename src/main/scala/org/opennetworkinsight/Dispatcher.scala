@@ -24,6 +24,8 @@ object Dispatcher {
         case "dns_pre_lda" => DnsPreLDA.run()
         case "flow_post_lda" =>FlowPostLDA.run()
         case "flow_pre_lda" => FlowPreLDA.run()
+        case "proxy_pre_lda" => ProxyPreLDA.run()
+        case "proxy_post_lda" => ProxyPostLDA.run()
       }
 
       System.exit(0)
