@@ -1,20 +1,22 @@
 package org.opennetworkinsight
 
 object FlowColumnIndex extends Enumeration {
-    val HOUR = 0
-    val MINUTE = 1
-    val SECOND = 2
-    val SOURCEIP = 3
-    val DESTIP = 4
-    val SOURCEPORT =5
-    val DESTPORT = 6
-    val IPKT = 7
-    val IBYT = 8
-    val NUMTIME = 9
-    val IBYTBIN = 10
-    val IPKTYBIN = 11
-    val TIMEBIN = 12
-    val SOURCEWORD = 13
-    val DESTWORD = 14
+    val HOUR = 4
+    val MINUTE = 5
+    val SECOND = 6
+    val SOURCEIP = 8
+    val DESTIP = 9
+    val SOURCEPORT = 10
+    val DESTPORT = 11
+    val IPKT = 16
+    val IBYT = 17
+    val NUMTIME = 27
+    val IBYTBIN = 28
+    val IPKTYBIN = 29
+    val TIMEBIN = 30
+    val PORTWORD = 31
+    val IPPAIR = 32
+    val SOURCEWORD = 33
+    val DESTWORD = 34
   }
 
