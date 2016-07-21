@@ -37,13 +37,12 @@ object ProxyPreLDA {
     val inputPaths = System.getenv("PROXY_PATH")
     val feedback_file = System.getenv("LPATH") + "/proxy_scores.csv"
     val duplication_factor = System.getenv("DUPFACTOR").toInt
-    val outputfile = System.getenv("HPATH") + "/proxy_counts"
+    val outputfile = System.getenv("HPATH") + "/word_counts"
 
 
     var dataframeColumns = new Array[String](0)
 
     val scoredFileExists = new java.io.File(feedback_file).exists
-
 
     val multidata = {
       var df = sqlContext.parquetFile(inputPaths.split(",")(0)).filter("proxy_date is not null and proxy_time is not null and proxy_clientip is not null")
@@ -60,8 +59,7 @@ object ProxyPreLDA {
       tempRDD
     }
 
-    println("Read source data")
-
+    val sample = multidata.take(1)(0).toString()
 
     val col = getColumnNames(dataframeColumns)
 
@@ -72,8 +70,6 @@ object ProxyPreLDA {
       addcol("feedback")
     }
 
-
-    print("Read source data")
     val rawdata :org.apache.spark.rdd.RDD[String] = {
       if (!scoredFileExists) { multidata
       }else {
@@ -89,25 +85,21 @@ object ProxyPreLDA {
       }
     })
 
-    addcol("host")
-    addcol("req_method")
-    addcol("response_code")
-    addcol("URI_length")
-
     logger.info("Adding words")
     data = data.map(row => {
-      row :+ row(col("proxy_host")) + "_" + row(col("proxy_reqmethod")) + "_" + row(col("proxy_respcode")) + "_" +
-        row(col("proxy_fulluri")).split('/').length.toString()
+      row :+ ProxyWordCreation.proxyWord(row(col("proxy_host")),
+        row(col("proxy_reqmethod")),
+        row(col("proxy_respcode")),
+        row(col("proxy_fulluri")))
     })
     addcol("word")
 
+    val wordSample = data.take(1)(0)
 
-    println("PROXY:  raw entry count: " + data.count())
-    logger.info("Persisting data")
-    val wc = data.map(row => (row(col("proxy_clientip")) + " " + row(col("word")), 1)).reduceByKey(_ + _).map(row => (row._1.split(" ")(0) + "," + row._1.split(" ")(1).toString + "," + row._2).mkString)
+    val wc = data.map(row => ((row(col("proxy_clientip")) , row(col("word"))), 1)).reduceByKey(_ + _).map({case ((ip, word), count) => List(ip, word, count).mkString(",")})
+    // val wc = data.map(row => ((row(col("proxy_clientip")) , row(col("word"))), 1))
     wc.persist(StorageLevel.MEMORY_AND_DISK)
     wc.saveAsTextFile(outputfile)
-    println("PROXY:  distinct ip  count: " + wc.count())
 
     sc.stop()
     logger.info("proxy pre LDA completed")

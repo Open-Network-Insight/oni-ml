@@ -36,6 +36,7 @@ export DUPFACTOR
 source /etc/duxbay.conf
 export FLOW_PATH
 export DNS_PATH
+export PROXY_PATH
 export HPATH
 export LUSER
 export LPATH
