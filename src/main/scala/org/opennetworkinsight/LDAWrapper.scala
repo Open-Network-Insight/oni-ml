@@ -30,8 +30,8 @@ object LDAWrapper {
       val words = documentWordData
         .cache
         .map(row => row(1))
-        .distinct()
-        .toArray()
+        .distinct
+        .collect
       words.zipWithIndex.toMap
     }
 
@@ -40,7 +40,7 @@ object LDAWrapper {
     // Create document Map Index, Document for further usage
     val documentDictionary: Map[Int, String] = {
       distinctDocument
-        .toArray()
+        .collect
         .zipWithIndex
         .sortBy(_._2)
         .map(kv => (kv._2, kv._1))
@@ -53,18 +53,18 @@ object LDAWrapper {
         .map(row => row(0))
         .map(document => (document, 1))
         .reduceByKey(_ + _)
-        .toArray
+        .collect
         .toMap
 
       val wordIndexdocWordCount = documentWordData
         .map(row => (row(0), wordDictionary(row(1)) + ":" + row(2)))
         .groupByKey()
         .map(x => (x._1, x._2.mkString(" ")))
-        .toArray
+        .collect
         .toMap
 
       distinctDocument
-        .toArray()
+        .collect
         .map(doc => documentCount(doc)
           + " "
           + wordIndexdocWordCount(doc))
@@ -82,10 +82,12 @@ object LDAWrapper {
       sys.process.Process(Seq("scp", "-r", localPath, node + ":" + localUser + "/ml/" + dataSource )).!
     }
 
-    // Execute MPI
+    // Execute Pre MPI command
     if(mpiPreparationCmd != "" && mpiPreparationCmd != null)
       stringToProcess(mpiPreparationCmd).!!
-    val result = sys.process.Process(Seq(mpiCmd, "-n", mpiProcessCount, "-f", "machinefile", "./lda", "est", "2.5",
+
+    // Execute MPI
+    sys.process.Process(Seq(mpiCmd, "-n", mpiProcessCount, "-f", "machinefile", "./lda", "est", "2.5",
       mpiTopicCount, "settings.txt", mpiProcessCount, modelFile, "random", localPath), new java.io.File(ldaPath)).!!
 
     // Read topic info per document
@@ -123,10 +125,11 @@ object LDAWrapper {
     }
 
     // Normalize p(w|z)
-    val pwgz = topicWordData.map(normalizeWord).transpose
+    val probabilityOfWordGivenTopic = topicWordData.map(normalizeWord).transpose
 
     // Create word results
-    val wordTopic = pwgz.zipWithIndex.map({ case (k, v) => indexWordDictionary(v) + "," + k.mkString(" ") })
+    val wordTopic = probabilityOfWordGivenTopic.zipWithIndex.map({ case (k, v) => indexWordDictionary(v) +
+      "," + k.mkString(" ") })
 
     val ldaResults = scala.collection.mutable.Map[String, Array[String]]()
     ldaResults.put("document_results", documentTopic)
@@ -140,11 +143,11 @@ object LDAWrapper {
 
     val topics: Array[Double] = wordProbability.trim().split(" ").map(_.toDouble)
     // calculate the exp of each element and return array
-    val rawWord: Array[Double] = topics.map(math.exp(_))
+    val rawWord: Array[Double] = topics.map(math.exp)
     // sum all exponential
     val sumRawWord = rawWord.sum
     // calculate normalized value for each element: for each each val => exp(val)/sum
-    rawWord.map(_ / sumRawWord).toArray
+    rawWord.map(_ / sumRawWord)
 
   }
 
