@@ -1,14 +1,14 @@
 #!/bin/bash
 
-# read in variables (except for date) from etc/.conf file
+# parse and validate arguments
+
 FDATE=$1
 DSOURCE=$2
-TOL=$3
+
 YR=${FDATE:0:4}
 MH=${FDATE:4:2}
 DY=${FDATE:6:2}
 
-# checking for required arguments
 if [[ "${#FDATE}" != "8" || -z "${DSOURCE}" ]]; then
     echo "ml_ops.sh syntax error"
     echo "Please run ml_ops.sh again with the correct syntax:"
@@ -19,108 +19,89 @@ if [[ "${#FDATE}" != "8" || -z "${DSOURCE}" ]]; then
     exit
 fi
 
-# number of total processes for mpi
-PROCESS_COUNT=20
 
-##do not edit##
-TOPIC_COUNT=20
-###############
-
-# intermediate ML results go in hive directory
-DFOLDER='hive'
-DUPFACTOR=1000
-export DUPFACTOR
-
-#  pre-processing scala
+# read in variables (except for date) from etc/.conf file
+# note: FDATE and DSOURCE *must* be defined prior sourcing this conf file
 
 source /etc/duxbay.conf
-export FLOW_PATH
-export DNS_PATH
-export PROXY_PATH
-export HPATH
-export LUSER
-export LPATH
-export TOL
-export KRB_AUTH
 
-hadoop fs -rm -R ${HPATH}/word_counts
-hadoop fs -rm -R ${HPATH}/lda_word_counts
+# third argument if present will override default TOL from conf file
 
-#CUT=$(<${DSOURCE}_qtiles)
-#export CUT
+if [ -n "$3" ]; then TOL=$3 ; fi
 
-# move TDM to local file system
-# do we have to do a mkdir here?
+
+# prepare parameters pipeline stages
+
+if [ "$DSOURCE" == "flow" ]; then
+    RAWDATA_PATH=${FLOW_PATH}
+elif [ "$DSOURCE" == "dns" ]; then
+    RAWDATA_PATH=${DNS_PATH}
+else
+    RAWDATA_PATH=${PROXY_PATH}
+fi
+
+FEEDBACK_PATH=${LPATH}/${DSOURCE}_scores.csv
+DUPFACTOR=1000
+
+PREPROCESS_STEP=${DSOURCE}_pre_lda
+POSTPROCESS_STEP=${DSOURCE}_post_lda
+
+HDFS_WORDCOUNTS=${HPATH}/word_counts
+
+# paths for intermediate files
+HDFS_DOCRESULTS=${HPATH}/doc_results.csv
+LOCAL_DOCRESULTS=${LPATH}/doc_results.csv
+
+HDFS_WORDRESULTS=${HPATH}/word_results.csv
+LOCAL_WORDRESULTS=${LPATH}/word_results.csv
+
+HDFS_SCORED_CONNECTS=${HPATH}/scores
+
+LDA_OUTPUT_DIR=${DSOURCE}/${FDATE}
+
+TOPIC_COUNT=20
+
+nodes=${NODES[0]}
+for n in "${NODES[@]:1}" ; do nodes+=",${n}"; done
+
+hdfs dfs -rm -R -f ${HDFS_WORDCOUNTS}
+wait
+
 mkdir -p ${LPATH}
 rm -f ${LPATH}/*.{dat,beta,gamma,other,pkl} # protect the flow_scores.csv file
 
-#kinit -kt /etc/security/keytabs/smokeuser.headless.keytab <user-id>
-time spark-submit --class "org.opennetworkinsight.Dispatcher" --master yarn-client --executor-memory  ${SPK_EXEC_MEM}  --driver-memory 2g --num-executors ${SPK_EXEC} --executor-cores 1 --conf spark.shuffle.io.preferDirectBufs=false --conf shuffle.service.enabled=true --conf spark.driver.maxResultSize="2g"   target/scala-2.10/oni-ml_2.10-1.1.jar ${DSOURCE}_pre_lda
+hdfs dfs -rm -R -f ${HDFS_SCORED_CONNECTS}
 
-hadoop fs -copyToLocal  ${HPATH}/word_counts/part-* ${LPATH}/.
+# Add -p <command> to execute pre MPI command.
+# Pre MPI command can be configured in /etc/duxbay.conf
+# In this script, after the line after -c ${MPI_CMD} add:
+# -p ${MPI_PREP_CMD}
+
+
+time spark-submit --class "org.opennetworkinsight.LDA" --master yarn-client --executor-memory  ${SPK_EXEC_MEM} \
+  --driver-memory 2g --num-executors ${SPK_EXEC} --executor-cores 1 --conf spark.shuffle.io.preferDirectBufs=false    \
+  --conf shuffle.service.enabled=true --conf spark.driver.maxResultSize="2g" target/scala-2.10/oni-ml-assembly-1.1.jar \
+   ${DSOURCE} \
+  -i ${RAWDATA_PATH}  \
+  -d ${DUPFACTOR} \
+  -f ${FEEDBACK_PATH} \
+  -m ${LPATH}/model.dat \
+  -o ${LPATH}/final.gamma \
+  -w ${LPATH}/final.beta \
+  -l ${LPATH} \
+  -a ${LDAPATH} \
+  -r ${LUSER} \
+  -c ${MPI_CMD}  \
+  -t ${PROCESS_COUNT} \
+  -u ${TOPIC_COUNT} \
+  -s ${DSOURCE} \
+  -n ${nodes} \
+  -h ${HDFS_SCORED_CONNECTS} \
+  -e ${TOL}
+
+wait
+
+# move results to hdfs.
 cd ${LPATH}
-cat part-* > doc_wc.dat
-rm -f part-*
-
-#   lda  stage
-source /etc/duxbay.conf
-cd ..
-time python lda_pre.py ${LPATH}/
-rm -f ${LPATH}/doc_wc.dat
-wc -l ${LPATH}/model.dat
-sleep 2
-#  copy input files to all nodes in a new folder for this day's LDA results
-# use array scp 
-for d in "${NODES[@]}" 
-do 
-	echo "copying $d ${LPATH} ${LUSER}"
-	scp -r ${LPATH} $d:${LUSER}/ml/.    
-done
-sleep 2
-cd ${LDAPATH}
-time mpiexec -n ${PROCESS_COUNT} -f machinefile ./lda est 2.5 ${TOPIC_COUNT} settings.txt ${PROCESS_COUNT} ../${FDATE}/model.dat random ../${FDATE}
-sleep 10
-
-cd ${LUSER}/ml
-time python lda_post.py ${LPATH}/
-
-
-# post-processing stage
-source /etc/duxbay.conf
-export FLOW_PATH
-export DNS_PATH
-export HPATH
-export TOL
-hadoop fs -rm ${HPATH}/doc_results.csv
-hadoop fs -put ${LPATH}/doc_results.csv ${HPATH}/.
-hadoop fs -rm ${HPATH}/word_results.csv
-hadoop fs -put ${LPATH}/word_results.csv ${HPATH}/.
-
-#TODO: need to pass in file path as a string
-
-hadoop fs -rm -R -f ${HPATH}/word_counts
-hadoop fs -rm -R -f ${HPATH}/scored
-
-if [ -n "$3" ]; then TOL=$3 ; fi
-export TOL
-
-
-#kinit -kt /etc/security/keytabs/smokeuser.headless.keytab <user-id>
-
-time spark-submit --class "org.opennetworkinsight.Dispatcher" --master yarn-client --executor-memory  ${SPK_EXEC_MEM}  --driver-memory 2g --num-executors ${SPK_EXEC} --executor-cores 1 --conf spark.shuffle.io.preferDirectBufs=false --conf shuffle.service.enabled=true --conf spark.driver.maxResultSize="2g" target/scala-2.10/oni-ml_2.10-1.1.jar ${DSOURCE}_post_lda
-
-
-hadoop fs -copyToLocal ${HPATH}/scored/part-* ${LPATH}/.
-
-cd ${LPATH}
-
-cat part-* > ${DSOURCE}_results.csv
-rm -f part-*
-
-#op ml stage         Ingest results_all_20150618.csv into suspicious connects front end
-source /etc/duxbay.conf
-
- #scp to UI node
- scp -r ${LPATH} ${UINODE}:${RPATH}
- 
-
+hadoop fs -getmerge ${HDFS_SCORED_CONNECTS}/part-* ${DSOURCE}_results.csv && hadoop fs -moveFromLocal \
+    ${DSOURCE}_results.csv  ${HDFS_SCORED_CONNECTS}/${DSOURCE}_results.csv

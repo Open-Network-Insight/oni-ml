@@ -6,8 +6,8 @@ source /etc/duxbay.conf
 #  copy solution files to all nodes
 for d in "${NODES[@]}" 
 do
-    # exclude the hidden files so we don't slam around VCS data...
-    rsync -v -a --exclude='.*' . $d:${LUSER}/ml
-	#scp -r ${LUSER}/ml $d:${LUSER}/.    
+    rsync -v -a --include='target' --include='target/scala-2.10' --include='target/scala-2.10/oni-ml-assembly-1.1.jar' \
+       --include='oni-lda-c' --include='oni-lda-c/*'  --include='*.py'  --include='*.sh' \
+      --exclude='*' .  $d:${LUSER}/ml
 done
 

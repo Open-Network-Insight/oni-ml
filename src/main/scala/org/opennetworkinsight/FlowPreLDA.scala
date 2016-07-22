@@ -2,9 +2,13 @@
 package org.opennetworkinsight
 
 import org.apache.log4j.{Level, Logger => apacheLogger}
+
 import org.apache.spark.rdd.RDD
 import org.apache.spark.{SparkConf, SparkContext}
-import org.slf4j.LoggerFactory
+import org.apache.spark.sql.SQLContext
+
+import org.slf4j.Logger
+
 import org.opennetworkinsight.{FlowColumnIndex => indexOf}
 
 import scala.io.Source
@@ -15,27 +19,13 @@ import scala.io.Source
   */
 object FlowPreLDA {
 
-  def run() = {
-
-    val logger = LoggerFactory.getLogger(this.getClass)
-    apacheLogger.getLogger("org").setLevel(Level.OFF)
-    apacheLogger.getLogger("akka").setLevel(Level.OFF)
+  def flowPreLDA(inputPath: String, scoresFile: String, duplicationFactor: Int,
+                 sc: SparkContext, sqlContext: SQLContext, logger: Logger ): RDD[String] = {
 
     logger.info("Flow pre LDA starts")
 
-    val conf = new SparkConf().setAppName("ONI ML: flow pre lda")
-    val sc = new SparkContext(conf)
-
-    val scoredFile = System.getenv("LPATH") + "/flow_scores.csv"
-    val file = System.getenv("FLOW_PATH")
-
-    val output_file = System.getenv("HPATH") + "/word_counts"
-    val output_file_for_lda = System.getenv("HPATH") + "/lda_word_counts"
-
-
+    val scoredFile = scoresFile
     logger.info("scoredFile:  " + scoredFile)
-    logger.info("outputFile:  " + output_file)
-    logger.info("output_file_for_lda:  " + output_file_for_lda)
 
     var ibyt_cuts = new Array[Double](10)
     var ipkt_cuts = new Array[Double](5)
@@ -145,14 +135,45 @@ object FlowPreLDA {
       buf.toString()
     }
 
-    logger.info("Trying to read file:  " + file)
-    val rawdata: RDD[String] = sc.textFile(file)
-    val datanoheader: RDD[String] = FlowWordCreation.removeHeader(rawdata)
+    logger.info("Trying to read file:  " + inputPath)
+    val rawdata: RDD[String] = {
+      val flowDataFrame = sqlContext.parquetFile(inputPath)
+        .filter("trhour BETWEEN 0 AND 23 AND  " +
+          "trminute BETWEEN 0 AND 59 AND  " +
+          "trsec BETWEEN 0 AND 59")
+        .select("treceived",
+          "tryear",
+          "trmonth",
+          "trday",
+          "trhour",
+          "trminute",
+          "trsec",
+          "tdur",
+          "sip",
+          "dip",
+          "sport",
+          "dport",
+          "proto",
+          "flag",
+          "fwd",
+          "stos",
+          "ipkt",
+          "ibyt",
+          "opkt",
+          "obyt",
+          "input",
+          "output",
+          "sas",
+          "das",
+          "dtos",
+          "dir",
+          "rip")
+      flowDataFrame.map(_.mkString(","))
+    }
 
-    val scoredFileExists = new java.io.File(scoredFile).exists
+    val scoredFileExists = if (scoredFile != "") new java.io.File(scoredFile).exists else false
 
     val scoredData: Array[String] = if (scoredFileExists) {
-      val duplicationFactor = System.getenv("DUPFACTOR").toInt
 
       val rowsToDuplicate = Source.fromFile(scoredFile).getLines().toArray.drop(1).filter(l => (l.split(',').length == 22) && l.split(',')(0).toInt == 3)
       logger.info("User feedback read from: " + scoredFile + ". "
@@ -163,11 +184,9 @@ object FlowPreLDA {
       Array[String]()
     }
 
-    val totalData: RDD[String] = datanoheader.union(sc.parallelize(scoredData))
+    val totalData: RDD[String] = rawdata.union(sc.parallelize(scoredData))
 
-    val datagood: RDD[String] = totalData.filter(line => line.split(",").length == 27)
-
-    val data_with_time = datagood.map(_.trim.split(',')).map(FlowWordCreation.addTime)
+    val data_with_time = totalData.map(_.trim.split(',')).map(FlowWordCreation.addTime)
 
     logger.info("calculating time cuts ...")
     time_cuts = Quantiles.computeDeciles(data_with_time.map(row => row(indexOf.NUMTIME).toDouble))
@@ -176,7 +195,7 @@ object FlowPreLDA {
     ibyt_cuts = Quantiles.computeDeciles(data_with_time.map(row => row(indexOf.IBYT).toDouble))
     logger.info(ibyt_cuts.mkString(","))
     logger.info("calculating pkt cuts")
-    ipkt_cuts = Quantiles.computeQuintiles(data_with_time.map(row => row(16).toDouble))
+    ipkt_cuts = Quantiles.computeQuintiles(data_with_time.map(row => row(indexOf.IPKT).toDouble))
     logger.info(ipkt_cuts.mkString(","))
 
     val binned_data = data_with_time.map(row => FlowWordCreation.binIbytIpktTime(row, ibyt_cuts, ipkt_cuts, time_cuts))
@@ -193,11 +212,10 @@ object FlowPreLDA {
     //val word_counts = sc.union(src_word_counts, dest_word_counts).map(row => Array(row._1.split(" ")(0).toString, row._1.split(" ")(1).toString, row._2).toString)
     val word_counts = sc.union(src_word_counts, dest_word_counts).map(row => (row._1.split(" ")(0) + "," + row._1.split(" ")(1).toString + "," + row._2).mkString)
 
-    logger.info("Persisting data")
-    word_counts.saveAsTextFile(output_file)
-
-    sc.stop()
+    //logger.info("Persisting data")
+    //sc.stop()
     logger.info("Flow pre LDA completed")
+    word_counts
 
   }
 

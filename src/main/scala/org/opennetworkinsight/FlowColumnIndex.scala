@@ -14,6 +14,8 @@ object FlowColumnIndex extends Enumeration {
     val IBYTBIN = 28
     val IPKTYBIN = 29
     val TIMEBIN = 30
+    val PORTWORD = 31
+    val IPPAIR = 32
     val SOURCEWORD = 33
     val DESTWORD = 34
   }
