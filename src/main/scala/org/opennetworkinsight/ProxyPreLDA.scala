@@ -52,18 +52,23 @@ object ProxyPreLDA {
           df = df.unionAll(sqlContext.parquetFile(file).filter("proxy_date is not null and proxy_time is not null and proxy_clientip is not null"))
         }
       }
-      df = df.select("proxy_date", "proxy_time", "proxy_clientip", "proxy_host", "proxy_reqmethod",
-        "proxy_useragent", "proxy_resconttype", "proxy_respcode", "proxy_fulluri")
+      df = df.select("proxy_date",
+        "proxy_time",
+        "proxy_clientip",
+        "proxy_host",
+        "proxy_reqmethod",
+        "proxy_useragent",
+        "proxy_resconttype",
+        "proxy_respcode",
+        "proxy_fulluri")
       dataframeColumns = df.columns
       val tempRDD: org.apache.spark.rdd.RDD[String] = df.map(_.mkString(","))
       tempRDD
     }
 
-    val sample = multidata.take(1)(0).toString()
-
     val col = getColumnNames(dataframeColumns)
 
-    def addcol(colname: String) = if (!col.keySet.exists(_ == colname)) {
+    def addcol(colname: String) = if (!col.keySet.contains(colname)) {
       col(colname) = col.values.max + 1
     }
     if (feedback_file != "None") {
@@ -77,7 +82,7 @@ object ProxyPreLDA {
       }
     }
 
-    var data = rawdata.map(line => line.split(",")).filter(line => (line.length == dataframeColumns.length)).map(line => {
+    var data = rawdata.map(line => line.split(",")).filter(line => line.length == dataframeColumns.length).map(line => {
       if (feedback_file != "None") {
         line :+ "None"
       } else {
@@ -94,10 +99,8 @@ object ProxyPreLDA {
     })
     addcol("word")
 
-    val wordSample = data.take(1)(0)
-
     val wc = data.map(row => ((row(col("proxy_clientip")) , row(col("word"))), 1)).reduceByKey(_ + _).map({case ((ip, word), count) => List(ip, word, count).mkString(",")})
-    // val wc = data.map(row => ((row(col("proxy_clientip")) , row(col("word"))), 1))
+
     wc.persist(StorageLevel.MEMORY_AND_DISK)
     wc.saveAsTextFile(outputfile)
 

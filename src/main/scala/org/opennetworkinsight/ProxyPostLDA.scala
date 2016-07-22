@@ -68,8 +68,19 @@ object ProxyPostLDA {
           df = df.unionAll(sqlContext.parquetFile(file).filter("proxy_date is not null and proxy_time is not null and proxy_clientip is not null"))
         }
       }
-      df = df.select("proxy_date", "proxy_time", "proxy_clientip", "proxy_host", "proxy_reqmethod",
-        "proxy_useragent", "proxy_resconttype", "proxy_respcode", "proxy_fulluri")
+      df = df.select("proxy_date",
+        "proxy_time",
+        "proxy_clientip",
+        "proxy_host",
+        "proxy_reqmethod",
+        "proxy_useragent",
+        "proxy_resconttype",
+        "proxy_duration",
+        "proxy_username",
+        "proxy_webcat",
+        "proxy_referer",
+        "proxy_respcode",
+        "proxy_fulluri")
       df_cols = df.columns
       val tempRDD: org.apache.spark.rdd.RDD[String] = df.map(_.mkString(","))
       tempRDD
