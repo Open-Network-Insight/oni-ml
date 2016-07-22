@@ -27,7 +27,11 @@ Names and language that we will use from the configuration variables for Open-Ne
 - HUSER An HDFS user path that will be the base path for the solution; this is usually the same user that you created to run the solution
 - LPATH The local path for the ML intermediate and final results, dynamically created and populated when the pipeline runs
 - HPATH Location for storing intermediate results of the analysis on HDFS.
+- MPI_CMD : command for executing MPI on your system, eg. `mpiexec` or `mpiexec.hydra` This will vary with your MPI installation!
+- MPI_PREP_CMD : a command that must be run before executing MPI on your system, such as sourcing a file of environment variables or exporting a path. May be empty. Will vary with your MPI installation.
+- PROCESS_COUNT : Number of processes executing in MPI.
 
+In version 1.1 and onward, the variables `MPI_CMD`, `MPI_PREP_CMD` and `PROCESS_COUNT` must be properly defined in `/etc/duxbay.conf` for the oni-ml pipeline to work correctly.
 
 ### Prepare data for input 
 
