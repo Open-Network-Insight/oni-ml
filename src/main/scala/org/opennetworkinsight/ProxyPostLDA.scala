@@ -80,7 +80,14 @@ object ProxyPostLDA {
         "proxy_webcat",
         "proxy_referer",
         "proxy_respcode",
+        "proxy_uriport",
+        "proxy_uripath",
+        "proxy_uriquery",
+        "proxy_serverip",
+        "proxy_scbytes",
+        "proxy_csbytes",
         "proxy_fulluri")
+
       df_cols = df.columns
       val tempRDD: org.apache.spark.rdd.RDD[String] = df.map(_.mkString(","))
       tempRDD
