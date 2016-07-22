@@ -9,7 +9,7 @@ import org.opennetworkinsight.LDAArgumentParser.Config
 
 import scala.io.Source
 
-object LDA {
+object SuspiciousConnects {
 
   val parser = {
     LDAArgumentParser.getParser()
