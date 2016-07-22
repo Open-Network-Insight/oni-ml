@@ -20,13 +20,7 @@ import scala.math._
       var numparts = spliturl.length
       var domain = "None"
       var subdomain = "None"
-      //var country ="None"
-      //var tld = "None"
-      var host = {
-        if (numparts > 0) {
-          spliturl(0)
-        } else "None"
-      }
+
 
       //first check if query is an Ip address e.g.: 123.103.104.10.in-addr.arpa or a name
       val is_ip = {
@@ -50,9 +44,7 @@ import scala.math._
         }
         else {
           domain = spliturl(numparts - 2)
-          if (1 <= numparts - 2) {
-            subdomain = spliturl.slice(0, numparts - 2).mkString(".")
-          }
+          subdomain = spliturl.slice(0, numparts - 2).mkString(".")
         }
       }
       Array(domain, subdomain, {
