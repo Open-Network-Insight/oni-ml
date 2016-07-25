@@ -34,8 +34,10 @@ if [ -n "$3" ]; then TOL=$3 ; fi
 
 if [ "$DSOURCE" == "flow" ]; then
     RAWDATA_PATH=${FLOW_PATH}
-else
+elif [ "$DSOURCE" == "dns" ]; then
     RAWDATA_PATH=${DNS_PATH}
+else
+    RAWDATA_PATH=${PROXY_PATH}
 fi
 
 FEEDBACK_PATH=${LPATH}/${DSOURCE}_scores.csv
@@ -72,30 +74,30 @@ hdfs dfs -rm -R -f ${HDFS_SCORED_CONNECTS}
 
 # Add -p <command> to execute pre MPI command.
 # Pre MPI command can be configured in /etc/duxbay.conf
-# In this script, after the line after -c ${MPI_CMD} add:
-# -p ${MPI_PREP_CMD}
+# In this script, after the line after --mpicmd ${MPI_CMD} add:
+# --mpiprep ${MPI_PREP_CMD}
 
 
 time spark-submit --class "org.opennetworkinsight.LDA" --master yarn-client --executor-memory  ${SPK_EXEC_MEM} \
   --driver-memory 2g --num-executors ${SPK_EXEC} --executor-cores 1 --conf spark.shuffle.io.preferDirectBufs=false    \
-  --conf shuffle.service.enabled=true --conf spark.driver.maxResultSize="2g" target/scala-2.10/oni-ml-assembly-1.1.jar \
+  --conf spark.shuffle.service.enabled=true --conf spark.driver.maxResultSize="2g" target/scala-2.10/oni-ml-assembly-1.1.jar \
    ${DSOURCE} \
-  -i ${RAWDATA_PATH}  \
-  -d ${DUPFACTOR} \
-  -f ${FEEDBACK_PATH} \
-  -m ${LPATH}/model.dat \
-  -o ${LPATH}/final.gamma \
-  -w ${LPATH}/final.beta \
-  -l ${LPATH} \
-  -a ${LDAPATH} \
-  -r ${LUSER} \
-  -c ${MPI_CMD}  \
-  -t ${PROCESS_COUNT} \
-  -u ${TOPIC_COUNT} \
-  -s ${DSOURCE} \
-  -n ${nodes} \
-  -h ${HDFS_SCORED_CONNECTS} \
-  -e ${TOL}
+  --input ${RAWDATA_PATH}  \
+  --dupfactor ${DUPFACTOR} \
+  --feedback ${FEEDBACK_PATH} \
+  --model ${LPATH}/model.dat \
+  --topicdoc ${LPATH}/final.gamma \
+  --topicword ${LPATH}/final.beta \
+  --lpath ${LPATH} \
+  --ldapath ${LDAPATH} \
+  --luser ${LUSER} \
+  --mpicmd ${MPI_CMD}  \
+  --proccount ${PROCESS_COUNT} \
+  --topiccount ${TOPIC_COUNT} \
+  --dsource ${DSOURCE} \
+  --nodes ${nodes} \
+  --scored ${HDFS_SCORED_CONNECTS} \
+  --threshold ${TOL}
 
 wait
 

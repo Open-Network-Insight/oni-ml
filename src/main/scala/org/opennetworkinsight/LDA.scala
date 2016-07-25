@@ -1,13 +1,12 @@
 
 package org.opennetworkinsight
 
-import org.apache.log4j.{Level, Logger => apacheLogger}
+import org.apache.log4j.{Level, Logger}
 import org.apache.spark.{SparkConf, SparkContext}
 import org.apache.spark.sql.SQLContext
 import org.slf4j.LoggerFactory
 import org.opennetworkinsight.LDAArgumentParser.Config
 
-import scala.io.Source
 
 object LDA {
 
@@ -23,8 +22,8 @@ object LDA {
       case Some(config) => {
 
         val logger = LoggerFactory.getLogger(this.getClass)
-        apacheLogger.getLogger("org").setLevel(Level.OFF)
-        apacheLogger.getLogger("akka").setLevel(Level.OFF)
+        Logger.getLogger("org").setLevel(Level.OFF)
+        Logger.getLogger("akka").setLevel(Level.OFF)
 
         val sparkConfig = new SparkConf().setAppName("ONI ML:  " + dataSource + " lda")
         val sparkContext = new SparkContext(sparkConfig)
@@ -32,12 +31,10 @@ object LDA {
 
         dataSource match {
 
-          case "flow" => {
-            FlowLDA run(config, sparkContext, sqlContext, logger)
-          }
-          case "dns" => {
-            DNSLDA run(config, sparkContext, sqlContext, logger)
-          }
+          case "flow" => FlowLDA.run(config, sparkContext, sqlContext, logger)
+          case "dns" =>  DNSLDA.run(config, sparkContext, sqlContext, logger)
+          case "proxy" => ProxyLDA.run(config, sparkContext, sqlContext, logger)
+          case _ => println("ERROR:  unsupported (or misspelled) anlaysis: " + dataSource)
         }
 
         sparkContext.stop()

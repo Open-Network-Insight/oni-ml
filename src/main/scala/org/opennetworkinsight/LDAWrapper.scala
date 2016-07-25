@@ -70,7 +70,8 @@ object LDAWrapper {
           + wordIndexdocWordCount(doc))
     }
 
-    // Persis model.dat
+    // Persist model.dat
+
     val modelWriter = new PrintWriter(new File(modelFile))
     model foreach (row => modelWriter.write("%s\n".format(row)))
     modelWriter.close()
