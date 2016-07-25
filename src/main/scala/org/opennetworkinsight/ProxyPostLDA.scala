@@ -112,7 +112,6 @@ object ProxyPostLDA {
     logger.info("Persisting data")
 
     val scored = src_scored.filter({case (score, row) => score < threshold}).sortByKey().map({case (score, row) => row.mkString(",")})
-    scored.persist(StorageLevel.MEMORY_AND_DISK)
     scored.saveAsTextFile(resultsFilePath)
 
     sc.stop()
