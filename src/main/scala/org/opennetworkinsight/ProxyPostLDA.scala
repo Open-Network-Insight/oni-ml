@@ -1,14 +1,16 @@
 package org.opennetworkinsight
 
-import org.apache.log4j.{Level, Logger}
+import org.apache.log4j.{Level, Logger => ApacheLogger}
 import org.apache.spark.sql.SQLContext
 import org.apache.spark.storage.StorageLevel
-import org.apache.spark.{SparkConf, SparkContext}
-import org.slf4j.LoggerFactory
+import org.apache.spark.SparkContext
+import org.slf4j.{Logger, LoggerFactory}
 
-import scala.io.Source
-
+/**
+  *
+  */
 object ProxyPostLDA {
+
   def getColumnNames(input: Array[String], sep: Char = ','): scala.collection.mutable.Map[String, Int] = {
     val columns = scala.collection.mutable.Map[String, Int]()
     val header = input.zipWithIndex
@@ -16,34 +18,23 @@ object ProxyPostLDA {
     columns
   }
 
-  def run() = {
+  def proxyPostLDA(inputPath: String, resultsFilePath: String, threshold: Double, documentResults: Array[String],
+                 wordResults: Array[String], sc: SparkContext, sqlContext: SQLContext, logger: Logger) = {
 
     val logger = LoggerFactory.getLogger(this.getClass)
-    Logger.getLogger("org").setLevel(Level.OFF)
-    Logger.getLogger("akka").setLevel(Level.OFF)
+    ApacheLogger.getLogger("org").setLevel(Level.OFF)
+    ApacheLogger.getLogger("akka").setLevel(Level.OFF)
 
     logger.info("Proxy post LDA starts")
 
-    val conf = new SparkConf().setAppName("ONI ML: proxy post lda")
-    val sc = new SparkContext(conf)
-    val sqlContext = new SQLContext(sc)
-    import sqlContext.implicits._
-
-
-    val inputPaths = System.getenv("PROXY_PATH")
-    val topicMixFile = System.getenv("HPATH") + "/doc_results.csv"
-    val pwordFile = System.getenv("HPATH") + "/word_results.csv"
-    val scoredOutputFile = System.getenv("HPATH") + "/scored"
-    val threshold: Double = System.getenv("TOL").toDouble
-
-    val topics_lines = sc.textFile(topicMixFile)
-    val words_lines = sc.textFile(pwordFile)
+    val topics_lines = documentResults
+    val words_lines = wordResults
 
     val l_topics = topics_lines.map(line => {
       val ip = line.split(",")(0)
       val topicProbs = line.split(",")(1).split(' ').map(_.toDouble)
       (ip, topicProbs)
-    }).map({case (ip, topicProbs) => ip -> topicProbs }).collectAsMap()
+    }).map({case (ip, topicProbs) => ip -> topicProbs }).toMap
 
     val topics = sc.broadcast(l_topics)
 
@@ -51,18 +42,17 @@ object ProxyPostLDA {
       val word = line.split(",")(0)
       val probPerTopic = line.split(",")(1).split(' ').map(_.toDouble)
       (word, probPerTopic)
-    }).map({case (word, probPerTopic)  => word -> probPerTopic}).collectAsMap()
+    }).map({case (word, probPerTopic)  => word -> probPerTopic}).toMap
 
     val words = sc.broadcast(l_words)
-
 
     logger.info("Proxy post LDA starts")
 
     var df_cols = new Array[String](0)
 
     val multidata = {
-      var df = sqlContext.parquetFile(inputPaths.split(",")(0)).filter("proxy_date is not null and proxy_time is not null and proxy_clientip is not null")
-      val files = inputPaths.split(",")
+      var df = sqlContext.parquetFile(inputPath.split(",")(0)).filter("proxy_date is not null and proxy_time is not null and proxy_clientip is not null")
+      val files = inputPath.split(",")
       for ((file, index) <- files.zipWithIndex) {
         if (index > 1) {
           df = df.unionAll(sqlContext.parquetFile(file).filter("proxy_date is not null and proxy_time is not null and proxy_clientip is not null"))
@@ -95,12 +85,12 @@ object ProxyPostLDA {
 
     val col = getColumnNames(df_cols)
 
-    def addcol(colname: String) = if (!col.keySet.exists(_ == colname)) {
+    def addcol(colname: String) = if (!col.keySet.contains(colname)) {
       col(colname) = col.values.max + 1
     }
 
     val rawdata :org.apache.spark.rdd.RDD[String] =  multidata
-    var data = rawdata.map(line => line.split(",")).filter(line => (line.length == df_cols.length))
+    var data = rawdata.map(line => line.split(",")).filter(_.length == df_cols.length)
 
     logger.info("Adding words")
     data = data.map(row => {
@@ -112,8 +102,8 @@ object ProxyPostLDA {
     logger.info("Computing conditional probability")
 
     val src_scored = data.map(row => {
-      val topic_mix = topics.value.getOrElse(row(col("proxy_clientip")), Array(0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05)).asInstanceOf[Array[Double]]
-      val word_prob = words.value.getOrElse(row(col("word")), Array(0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05)).asInstanceOf[Array[Double]]
+      val topic_mix = topics.value.getOrElse(row(col("proxy_clientip")), Array(0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05))
+      val word_prob = words.value.getOrElse(row(col("word")), Array(0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05))
       var src_score = 0.0
       for (i <- 0 to 19) {
         src_score += topic_mix(i) * word_prob(i)
@@ -124,11 +114,13 @@ object ProxyPostLDA {
     addcol("score")
 
     logger.info("Persisting data")
-    val scored = src_scored.sortByKey().map(row => row._2.mkString(","))
+
+    val scored = src_scored.filter({case (score, row) => score < threshold}).sortByKey().map({case (score, row) => row.mkString(",")})
     scored.persist(StorageLevel.MEMORY_AND_DISK)
-    scored.saveAsTextFile(scoredOutputFile)
+    scored.saveAsTextFile(resultsFilePath)
 
     sc.stop()
     logger.info("proxy post LDA completed")
+
   }
 }

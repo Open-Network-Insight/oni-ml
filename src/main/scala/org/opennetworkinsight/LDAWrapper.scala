@@ -24,6 +24,7 @@ object LDAWrapper {
   =
   {
 
+    println("Proxy topic analysis: gathering words")
     val documentWordData = docWordCount.map(_.split(","))
     // Create word Map Word,Index for further usage
     val wordDictionary: Map[String, Int] = {
@@ -71,6 +72,7 @@ object LDAWrapper {
     }
 
     // Persis model.dat
+    println("Proxy topic analysis ")
     val modelWriter = new PrintWriter(new File(modelFile))
     model foreach (row => modelWriter.write("%s\n".format(row)))
     modelWriter.close()
@@ -86,6 +88,7 @@ object LDAWrapper {
     if(mpiPreparationCmd != "" && mpiPreparationCmd != null)
       stringToProcess(mpiPreparationCmd).!!
 
+    println("Proxy topic analysis, MPI executing" )
     // Execute MPI
     sys.process.Process(Seq(mpiCmd, "-n", mpiProcessCount, "-f", "machinefile", "./lda", "est", "2.5",
       mpiTopicCount, "settings.txt", mpiProcessCount, modelFile, "random", localPath), new java.io.File(ldaPath)).!!
@@ -135,6 +138,7 @@ object LDAWrapper {
     ldaResults.put("document_results", documentTopic)
     ldaResults.put("word_results", wordTopic)
 
+    println("Proxy topic analysis completed")
     ldaResults
   }
 

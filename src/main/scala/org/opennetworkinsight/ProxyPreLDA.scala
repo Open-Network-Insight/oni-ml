@@ -2,9 +2,10 @@ package org.opennetworkinsight
 
 
 import org.apache.log4j.{Level, Logger => apacheLogger}
+import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.SQLContext
 import org.apache.spark.{SparkConf, SparkContext}
-import org.slf4j.LoggerFactory
+import org.slf4j.{Logger, LoggerFactory}
 import org.apache.spark.sql.types._
 import org.apache.spark.storage.StorageLevel
 
@@ -21,7 +22,8 @@ object ProxyPreLDA {
     columns
   }
 
-  def run() = {
+  def proxyPreLDA(inputPath: String, feedbackFile: String, duplicationFactor: Int,
+                  sc: SparkContext, sqlContext: SQLContext, logger: Logger): RDD[String] = {
 
     val logger = LoggerFactory.getLogger(this.getClass)
     apacheLogger.getLogger("org").setLevel(Level.OFF)
@@ -29,24 +31,13 @@ object ProxyPreLDA {
 
     logger.info("Proxy pre LDA starts")
 
-    val conf = new SparkConf().setAppName("ONI ML: proxy pre lda")
-    val sc = new SparkContext(conf)
-    val sqlContext = new SQLContext(sc)
-    import sqlContext.implicits._
-
-    val inputPaths = System.getenv("PROXY_PATH")
-    val feedback_file = System.getenv("LPATH") + "/proxy_scores.csv"
-    val duplication_factor = System.getenv("DUPFACTOR").toInt
-    val outputfile = System.getenv("HPATH") + "/word_counts"
-
-
     var dataframeColumns = new Array[String](0)
 
-    val scoredFileExists = new java.io.File(feedback_file).exists
+    val feedbackFileExists = new java.io.File(feedbackFile).exists
 
     val multidata = {
-      var df = sqlContext.parquetFile(inputPaths.split(",")(0)).filter("proxy_date is not null and proxy_time is not null and proxy_clientip is not null")
-      val files = inputPaths.split(",")
+      var df = sqlContext.parquetFile(inputPath.split(",")(0)).filter("proxy_date is not null and proxy_time is not null and proxy_clientip is not null")
+      val files = inputPath.split(",")
       for ((file, index) <- files.zipWithIndex) {
         if (index > 1) {
           df = df.unionAll(sqlContext.parquetFile(file).filter("proxy_date is not null and proxy_time is not null and proxy_clientip is not null"))
@@ -71,19 +62,19 @@ object ProxyPreLDA {
     def addcol(colname: String) = if (!col.keySet.contains(colname)) {
       col(colname) = col.values.max + 1
     }
-    if (feedback_file != "None") {
+    if (feedbackFile != "None") {
       addcol("feedback")
     }
 
     val rawdata :org.apache.spark.rdd.RDD[String] = {
-      if (!scoredFileExists) { multidata
+      if (!feedbackFileExists) { multidata
       }else {
         multidata
       }
     }
 
     var data = rawdata.map(line => line.split(",")).filter(line => line.length == dataframeColumns.length).map(line => {
-      if (feedback_file != "None") {
+      if (feedbackFile != "None") {
         line :+ "None"
       } else {
         line
@@ -101,11 +92,9 @@ object ProxyPreLDA {
 
     val wc = data.map(row => ((row(col("proxy_clientip")) , row(col("word"))), 1)).reduceByKey(_ + _).map({case ((ip, word), count) => List(ip, word, count).mkString(",")})
 
-    wc.persist(StorageLevel.MEMORY_AND_DISK)
-    wc.saveAsTextFile(outputfile)
-
-    sc.stop()
     logger.info("proxy pre LDA completed")
+
+    wc
   }
 }
 
