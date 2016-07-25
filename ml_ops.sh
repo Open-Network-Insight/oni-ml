@@ -74,8 +74,8 @@ hdfs dfs -rm -R -f ${HDFS_SCORED_CONNECTS}
 
 # Add -p <command> to execute pre MPI command.
 # Pre MPI command can be configured in /etc/duxbay.conf
-# In this script, after the line after -c ${MPI_CMD} add:
-# -p ${MPI_PREP_CMD}
+# In this script, after the line after --mpicmd ${MPI_CMD} add:
+# --mpiprep ${MPI_PREP_CMD}
 
 
 time spark-submit --class "org.opennetworkinsight.LDA" --master yarn-client --executor-memory  ${SPK_EXEC_MEM} \
