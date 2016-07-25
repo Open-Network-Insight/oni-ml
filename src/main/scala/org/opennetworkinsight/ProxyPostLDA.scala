@@ -21,10 +21,6 @@ object ProxyPostLDA {
   def proxyPostLDA(inputPath: String, resultsFilePath: String, threshold: Double, documentResults: Array[String],
                  wordResults: Array[String], sc: SparkContext, sqlContext: SQLContext, logger: Logger) = {
 
-    val logger = LoggerFactory.getLogger(this.getClass)
-    ApacheLogger.getLogger("org").setLevel(Level.OFF)
-    ApacheLogger.getLogger("akka").setLevel(Level.OFF)
-
     logger.info("Proxy post LDA starts")
 
     val topics_lines = documentResults

@@ -25,10 +25,6 @@ object ProxyPreLDA {
   def proxyPreLDA(inputPath: String, feedbackFile: String, duplicationFactor: Int,
                   sc: SparkContext, sqlContext: SQLContext, logger: Logger): RDD[String] = {
 
-    val logger = LoggerFactory.getLogger(this.getClass)
-    apacheLogger.getLogger("org").setLevel(Level.OFF)
-    apacheLogger.getLogger("akka").setLevel(Level.OFF)
-
     logger.info("Proxy pre LDA starts")
 
     var dataframeColumns = new Array[String](0)
