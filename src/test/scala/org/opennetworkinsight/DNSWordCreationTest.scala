@@ -1,6 +1,5 @@
 package org.opennetworkinsight
 
-import org.apache.spark.broadcast.Broadcast
 
 import org.opennetworkinsight.testutils.TestingSparkContextFlatSpec
 import org.scalatest.Matchers

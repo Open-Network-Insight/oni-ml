@@ -80,22 +80,22 @@ time spark-submit --class "org.opennetworkinsight.SuspiciousConnects" --master y
   --driver-memory 2g --num-executors ${SPK_EXEC} --executor-cores 1 --conf spark.shuffle.io.preferDirectBufs=false    \
   --conf shuffle.service.enabled=true --conf spark.driver.maxResultSize="2g" target/scala-2.10/oni-ml-assembly-1.1.jar \
    ${DSOURCE} \
-  -input ${RAWDATA_PATH}  \
-  -dupfactor ${DUPFACTOR} \
-  -feedback ${FEEDBACK_PATH} \
-  -model ${LPATH}/model.dat \
-  -topicdoc ${LPATH}/final.gamma \
-  -topicword ${LPATH}/final.beta \
-  -lpath ${LPATH} \
-  -ldapath ${LDAPATH} \
-  -luser ${LUSER} \
-  -mpicmd ${MPI_CMD}  \
-  -proccount ${PROCESS_COUNT} \
-  -topicount ${TOPIC_COUNT} \
-  -dsource ${DSOURCE} \
-  -nodes ${nodes} \
-  -scored ${HDFS_SCORED_CONNECTS} \
-  -threshold ${TOL}
+  --input ${RAWDATA_PATH}  \
+  --dupfactor ${DUPFACTOR} \
+  --feedback ${FEEDBACK_PATH} \
+  --model ${LPATH}/model.dat \
+  --topicdoc ${LPATH}/final.gamma \
+  --topicword ${LPATH}/final.beta \
+  --lpath ${LPATH} \
+  --ldapath ${LDAPATH} \
+  --luser ${LUSER} \
+  --mpicmd ${MPI_CMD}  \
+  --proccount ${PROCESS_COUNT} \
+  --topiccount ${TOPIC_COUNT} \
+  --dsource ${DSOURCE} \
+  --nodes ${nodes} \
+  --scored ${HDFS_SCORED_CONNECTS} \
+  --threshold ${TOL}
 
 wait
 
