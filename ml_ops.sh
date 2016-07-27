@@ -34,8 +34,10 @@ if [ -n "$3" ]; then TOL=$3 ; fi
 
 if [ "$DSOURCE" == "flow" ]; then
     RAWDATA_PATH=${FLOW_PATH}
-else
+elif [ "$DSOURCE" == "dns" ]; then
     RAWDATA_PATH=${DNS_PATH}
+else
+    RAWDATA_PATH=${PROXY_PATH}
 fi
 
 FEEDBACK_PATH=${LPATH}/${DSOURCE}_scores.csv
@@ -72,13 +74,13 @@ hdfs dfs -rm -R -f ${HDFS_SCORED_CONNECTS}
 
 # Add -p <command> to execute pre MPI command.
 # Pre MPI command can be configured in /etc/duxbay.conf
-# In this script, after the line after -c ${MPI_CMD} add:
-# -p ${MPI_PREP_CMD}
+# In this script, after the line after --mpicmd ${MPI_CMD} add:
+# --mpiprep ${MPI_PREP_CMD}
 
 
 time spark-submit --class "org.opennetworkinsight.SuspiciousConnects" --master yarn-client --executor-memory  ${SPK_EXEC_MEM} \
   --driver-memory 2g --num-executors ${SPK_EXEC} --executor-cores 1 --conf spark.shuffle.io.preferDirectBufs=false    \
-  --conf shuffle.service.enabled=true --conf spark.driver.maxResultSize="2g" target/scala-2.10/oni-ml-assembly-1.1.jar \
+  --conf spark.shuffle.service.enabled=true --conf spark.driver.maxResultSize="2g" target/scala-2.10/oni-ml-assembly-1.1.jar \
    ${DSOURCE} \
   --input ${RAWDATA_PATH}  \
   --dupfactor ${DUPFACTOR} \
