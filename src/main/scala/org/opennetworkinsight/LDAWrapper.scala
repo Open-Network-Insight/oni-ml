@@ -36,6 +36,7 @@ object LDAWrapper {
     }
 
     val distinctDocument = documentWordData.map(row => row(0)).distinct
+    distinctDocument.cache()
 
     // Create document Map Index, Document for further usage
     val documentDictionary: Map[Int, String] = {
