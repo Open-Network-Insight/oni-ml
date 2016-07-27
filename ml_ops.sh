@@ -78,7 +78,7 @@ hdfs dfs -rm -R -f ${HDFS_SCORED_CONNECTS}
 # --mpiprep ${MPI_PREP_CMD}
 
 
-time spark-submit --class "org.opennetworkinsight.LDA" --master yarn-client --executor-memory  ${SPK_EXEC_MEM} \
+time spark-submit --class "org.opennetworkinsight.SuspiciousConnects" --master yarn-client --executor-memory  ${SPK_EXEC_MEM} \
   --driver-memory 2g --num-executors ${SPK_EXEC} --executor-cores 1 --conf spark.shuffle.io.preferDirectBufs=false    \
   --conf spark.shuffle.service.enabled=true --conf spark.driver.maxResultSize="2g" target/scala-2.10/oni-ml-assembly-1.1.jar \
    ${DSOURCE} \

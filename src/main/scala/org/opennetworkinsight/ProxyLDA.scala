@@ -18,12 +18,12 @@ object ProxyLDA {
     val docWordCount = ProxyPreLDA.proxyPreLDA(config.inputPath, config.scoresFile, config.duplicationFactor, sparkContext,
       sqlContext, logger)
 
-    val ldaResult = LDAWrapper.runLDA(docWordCount, config.modelFile, config.topicDocumentFile, config.topicWordFile,
+    val (documentResults, wordResults) = LDAWrapper.runLDA(docWordCount, config.modelFile, config.topicDocumentFile, config.topicWordFile,
       config.mpiPreparationCmd, config.mpiCmd, config.mpiProcessCount, config.mpiTopicCount, config.localPath,
       config.ldaPath, config.localUser,  config.dataSource, config.nodes)
 
-    ProxyPostLDA.proxyPostLDA(config.inputPath, config.hdfsScoredConnect, config.threshold, ldaResult("document_results"),
-      ldaResult("word_results"), sparkContext, sqlContext, logger)
+    ProxyPostLDA.proxyPostLDA(config.inputPath, config.hdfsScoredConnect, config.threshold, documentResults,
+      wordResults, sparkContext, sqlContext, logger)
 
     logger.info("Proxy LDA completed")
   }

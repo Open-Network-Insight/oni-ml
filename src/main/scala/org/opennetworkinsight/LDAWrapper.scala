@@ -20,7 +20,7 @@ object LDAWrapper {
   def runLDA(docWordCount: RDD[String], modelFile: String, topicDocumentFile: String, topicWordFile: String,
              mpiPreparationCmd: String, mpiCmd: String, mpiProcessCount: String, mpiTopicCount: String,
              localPath: String, ldaPath: String, localUser: String, dataSource: String, nodes: String):
-  scala.collection.mutable.Map[String, Array[String]]
+  (Array[String], Array[String])
   =
   {
 
@@ -36,6 +36,7 @@ object LDAWrapper {
     }
 
     val distinctDocument = documentWordData.map(row => row(0)).distinct
+    distinctDocument.cache()
 
     // Create document Map Index, Document for further usage
     val documentDictionary: Map[Int, String] = {
@@ -48,30 +49,9 @@ object LDAWrapper {
     }
 
     // Create model for MPI
-    val model = {
-      val documentCount = documentWordData
-        .map(row => row(0))
-        .map(document => (document, 1))
-        .reduceByKey(_ + _)
-        .collect
-        .toMap
+    val model = createModel(documentWordData, wordDictionary, distinctDocument)
 
-      val wordIndexdocWordCount = documentWordData
-        .map(row => (row(0), wordDictionary(row(1)) + ":" + row(2)))
-        .groupByKey()
-        .map(x => (x._1, x._2.mkString(" ")))
-        .collect
-        .toMap
-
-      distinctDocument
-        .collect
-        .map(doc => documentCount(doc)
-          + " "
-          + wordIndexdocWordCount(doc))
-    }
-
-    // Persist model.dat
-
+    // Persis model.dat
     val modelWriter = new PrintWriter(new File(modelFile))
     model foreach (row => modelWriter.write("%s\n".format(row)))
     modelWriter.close()
@@ -103,11 +83,6 @@ object LDAWrapper {
       else Array[String]()
     }
 
-    // Create document results
-    val documentTopic = topicDocumentData.zipWithIndex.map({
-      case (k, v) => getTopicDocument(documentDictionary(v), k)
-    })
-
     // Read words per topic
     val topicWordData = {
       if (topicWordFileExists) {
@@ -116,27 +91,14 @@ object LDAWrapper {
       else Array[String]()
     }
 
-    // invert wordDictionary Map[Int, String]
-    val indexWordDictionary = {
-      val addedIndex = wordDictionary.size
-      val tempWordDictionary = wordDictionary + ("0_0_0_0_0" -> addedIndex)
-      tempWordDictionary.map({
-        case (k, v) => (v, k)
-      })
-    }
-
-    // Normalize p(w|z)
-    val probabilityOfWordGivenTopic = topicWordData.map(normalizeWord).transpose
+    // Create document results
+    val documentResults = getDocumentResults(topicDocumentData, documentDictionary)
 
     // Create word results
-    val wordTopic = probabilityOfWordGivenTopic.zipWithIndex.map({ case (k, v) => indexWordDictionary(v) +
-      "," + k.mkString(" ") })
+    val wordResults = getWordResults(topicWordData, wordDictionary)
 
-    val ldaResults = scala.collection.mutable.Map[String, Array[String]]()
-    ldaResults.put("document_results", documentTopic)
-    ldaResults.put("word_results", wordTopic)
+    (documentResults, wordResults)
 
-    ldaResults
   }
 
   def normalizeWord(wordProbability: String)
@@ -167,6 +129,55 @@ object LDAWrapper {
     }
   }
 
+  def createModel(documentWordData: RDD[Array[String]], wordDictionary: Map[String, Int], distinctDocument: RDD[String])
+  : Array[String]
+  = {
+    val documentCount = documentWordData
+      .map(row => row(0))
+      .map(document => (document, 1))
+      .reduceByKey(_ + _)
+      .collect
+      .toMap
+
+    val wordIndexdocWordCount = documentWordData
+      .map(row => (row(0), wordDictionary(row(1)) + ":" + row(2)))
+      .groupByKey()
+      .map(x => (x._1, x._2.mkString(" ")))
+      .collect
+      .toMap
+
+    distinctDocument
+      .collect
+      .map(doc => documentCount(doc)
+        + " "
+        + wordIndexdocWordCount(doc))
+  }
+
+  def getDocumentResults(topicDocumentData: Array[String], documentDictionary: Map[Int, String])
+  = {
+    topicDocumentData.zipWithIndex.map({
+      case (k, v) => getTopicDocument(documentDictionary(v), k)
+    })
+  }
+
+  def getWordResults(topicWordData: Array[String], wordDictionary: Map[String, Int])
+  ={
+    // invert wordDictionary Map[Int, String]
+    val indexWordDictionary = {
+      val addedIndex = wordDictionary.size
+      val tempWordDictionary = wordDictionary + ("0_0_0_0_0" -> addedIndex)
+      tempWordDictionary.map({
+        case (k, v) => (v, k)
+      })
+    }
+
+    // Normalize p(w|z)
+    val probabilityOfWordGivenTopic = topicWordData.map(normalizeWord).transpose
+
+    probabilityOfWordGivenTopic.zipWithIndex.map({ case (k, v) => indexWordDictionary(v) +
+      "," + k.mkString(" ") })
+
+  }
 }
 
 

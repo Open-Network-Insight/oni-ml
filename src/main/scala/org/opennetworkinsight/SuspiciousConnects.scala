@@ -7,8 +7,9 @@ import org.apache.spark.sql.SQLContext
 import org.slf4j.LoggerFactory
 import org.opennetworkinsight.LDAArgumentParser.Config
 
+import scala.io.Source
 
-object LDA {
+object SuspiciousConnects {
 
   val parser = {
     LDAArgumentParser.getParser()
