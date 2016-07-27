@@ -60,7 +60,7 @@ class LDAWrapperTest extends TestingSparkContextFlatSpec with Matchers{
       "-1_43_7.0_2.0_6.0" -> 2,
       "-1_80_6.0_1.0_1.0" -> 3)
 
-    val distinctDocument = documentWordData.map(row => row(0)).distinct
+    val distinctDocument = documentWordData.map(row => row(0)).distinct.collect
 
     val model = LDAWrapper.createModel(documentWordData, wordDictionary, distinctDocument)
 
