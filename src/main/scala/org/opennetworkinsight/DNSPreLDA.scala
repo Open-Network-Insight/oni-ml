@@ -8,7 +8,7 @@ import org.apache.spark.{SparkConf, SparkContext}
 import org.apache.spark.sql.types._
 import org.apache.spark.storage.StorageLevel
 
-import org.opennetworkinsight.LDAArgumentParser.Config
+import org.opennetworkinsight.SuspiciousConnectsArgumentParser.Config
 
 import scala.io.Source
 

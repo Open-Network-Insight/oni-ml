@@ -1,6 +1,6 @@
 package org.opennetworkinsight
 
-import org.opennetworkinsight.LDAArgumentParser.Config
+import org.opennetworkinsight.SuspiciousConnectsArgumentParser.Config
 
 import org.apache.spark.sql.SQLContext
 import org.apache.spark.SparkContext

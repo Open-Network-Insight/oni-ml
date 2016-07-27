@@ -4,7 +4,7 @@ package org.opennetworkinsight
 import org.apache.spark.sql.SQLContext
 import org.apache.spark.storage.StorageLevel
 import org.apache.spark.SparkContext
-import org.opennetworkinsight.LDAArgumentParser.Config
+import org.opennetworkinsight.SuspiciousConnectsArgumentParser.Config
 import org.slf4j.Logger
 
 import scala.io.Source
