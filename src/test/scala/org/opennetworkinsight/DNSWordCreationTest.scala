@@ -6,22 +6,9 @@ import org.scalatest.Matchers
 
 class DNSWordCreationTest extends TestingSparkContextFlatSpec with Matchers{
 
-  val countryCodesSet = Set("ac", "ad", "ae", "af", "ag", "ai", "al", "am", "an", "ao", "aq", "ar", "as", "at", "au",
-    "aw", "ax", "az", "ba", "bb", "bd", "be", "bf", "bg", "bh", "bi", "bj", "bm", "bn", "bo", "bq", "br", "bs", "bt",
-    "bv", "bw", "by", "bz", "ca", "cc", "cd", "cf", "cg", "ch", "ci", "ck", "cl", "cm", "cn", "co", "cr", "cu", "cv",
-    "cw", "cx", "cy", "cz", "de", "dj", "dk", "dm", "do", "dz", "ec", "ee", "eg", "eh", "er", "es", "et", "eu", "fi",
-    "fj", "fk", "fm", "fo", "fr", "ga", "gb", "gd", "ge", "gf", "gg", "gh", "gi", "gl", "gm", "gn", "gp", "gq", "gr",
-    "gs", "gt", "gu", "gw", "gy", "hk", "hm", "hn", "hr", "ht", "hu", "id", "ie", "il", "im", "in", "io", "iq", "ir",
-    "is", "it", "je", "jm", "jo", "jp", "ke", "kg", "kh", "ki", "km", "kn", "kp", "kr", "krd", "kw", "ky", "kz", "la",
-    "lb", "lc", "li", "lk", "lr", "ls", "lt", "lu", "lv", "ly", "ma", "mc", "md", "me", "mg", "mh", "mk", "ml", "mm",
-    "mn", "mo", "mp", "mq", "mr", "ms", "mt", "mu", "mv", "mw", "mx", "my", "mz", "na", "nc", "ne", "nf", "ng", "ni",
-    "nl", "no", "np", "nr", "nu", "nz", "om", "pa", "pe", "pf", "pg", "ph", "pk", "pl", "pm", "pn", "pr", "ps", "pt",
-    "pw", "py", "qa", "re", "ro", "rs", "ru", "rw", "sa", "sb", "sc", "sd", "se", "sg", "sh", "si", "sj", "", "sk",
-    "sl", "sm", "sn", "so", "sr", "ss", "st", "su", "sv", "sx", "sy", "sz", "tc", "td", "tf", "tg", "th", "tj", "tk",
-    "tl", "tm", "tn", "to", "tp", "tr", "tt", "tv", "tw", "tz", "ua", "ug", "uk", "us", "uy", "uz", "va", "vc", "ve",
-    "vg", "vi", "vn", "vu", "wf", "ws", "ye", "yt", "za", "zm", "zw")
+  val countryCodesSet = DNSWordCreation.l_country_codes
 
-  "extractSubdomain" should "return domain=None, subdomina= None, subdomain lenght= 0 and number of parts = 6" in {
+  "extractSubdomain" should "return domain=None, subdomain= None, subdomain length= 0 and number of parts = 6" in {
 
     val url = "123.103.104.10.in-addr.arpa"
     val countryCodes = sparkContext.broadcast(countryCodesSet)
@@ -36,7 +23,7 @@ class DNSWordCreationTest extends TestingSparkContextFlatSpec with Matchers{
   }
 
   it should "return domain=url index 'number of parts -3' , subdoamin=subset of url from index 0 to index 'number of parts" +
-    "- 3', subdomain lenght= subdomain.lenght" in {
+    "- 3', subdomain length= subdomain.length" in {
 
     val url = "services.amazon.com.mx"
     val countryCodes = sparkContext.broadcast(countryCodesSet)
@@ -50,7 +37,7 @@ class DNSWordCreationTest extends TestingSparkContextFlatSpec with Matchers{
     result(3) shouldBe "4"
   }
 
-  it should "return domain=index 'number of parts -2' and subdomain=None, subdomain lenght=0" in {
+  it should "return domain=index 'number of parts -2' and subdomain=None, subdomain length=0" in {
 
     val url = "amazon.com.mx"
     val countryCodes = sparkContext.broadcast(countryCodesSet)
@@ -65,7 +52,7 @@ class DNSWordCreationTest extends TestingSparkContextFlatSpec with Matchers{
   }
 
   it should "return domain=index 'number of parts -2' and subdomain=subset of url parts from index 0 to index 'number " +
-    "of parts -2', subdomain lenght!=0" in {
+    "of parts -2', subdomain length!=0" in {
 
     val url = "services.amazon.com"
     val countryCodes = sparkContext.broadcast(countryCodesSet)
@@ -79,7 +66,7 @@ class DNSWordCreationTest extends TestingSparkContextFlatSpec with Matchers{
     result(3) shouldBe "3"
   }
 
-  "extractSubdomain" should "return domain=None, subdomina= None, subdomain lenght= 0 and number of parts = 2" in {
+  "extractSubdomain" should "return domain=None, subdomain= None, subdomain length= 0 and number of parts = 2" in {
 
     val url = "amazon.com"
     val countryCodes = sparkContext.broadcast(countryCodesSet)

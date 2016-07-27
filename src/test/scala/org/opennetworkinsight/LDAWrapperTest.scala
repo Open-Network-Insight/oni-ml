@@ -8,12 +8,12 @@ class LDAWrapperTest extends TestingSparkContextFlatSpec with Matchers{
 
 
   "normalizeWord" should "calculate exponential of each value in the input string, then sum up all the exponential and " +
-    "then divided  each exponential by the total sum" in {
+    "then divide  each exponential by the total sum" in {
 
     val wordProbability = "1 2 3 4 5"
     val result = LDAWrapper.normalizeWord(wordProbability)
 
-    result.size shouldBe 5
+    result.length shouldBe 5
     result(0) shouldBe 0.011656230956039607
     result(1) shouldBe 0.03168492079612427
     result(2) shouldBe 0.0861285444362687
