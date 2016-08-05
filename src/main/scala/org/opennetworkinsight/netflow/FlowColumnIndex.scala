@@ -1,4 +1,4 @@
-package org.opennetworkinsight
+package org.opennetworkinsight.netflow
 
 object FlowColumnIndex extends Enumeration {
     val HOUR = 4

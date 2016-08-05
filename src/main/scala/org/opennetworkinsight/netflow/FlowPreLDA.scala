@@ -1,15 +1,13 @@
 
-package org.opennetworkinsight
+package org.opennetworkinsight.netflow
 
-import org.apache.log4j.{Level, Logger => apacheLogger}
-
+import org.apache.log4j.{Logger => apacheLogger}
+import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
-import org.apache.spark.{SparkConf, SparkContext}
 import org.apache.spark.sql.SQLContext
-
+import org.opennetworkinsight.utilities.Quantiles
+import org.opennetworkinsight.netflow.{FlowColumnIndex => indexOf}
 import org.slf4j.Logger
-
-import org.opennetworkinsight.{FlowColumnIndex => indexOf}
 
 import scala.io.Source
 

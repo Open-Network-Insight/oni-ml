@@ -1,13 +1,13 @@
-package org.opennetworkinsight
+package org.opennetworkinsight.proxy
 
-import org.apache.log4j.{Level, Logger => ApacheLogger}
-import org.apache.spark.sql.{DataFrame, Row, SQLContext}
-import org.apache.spark.storage.StorageLevel
+import org.apache.log4j.{Logger => ApacheLogger}
 import org.apache.spark.SparkContext
 import org.apache.spark.broadcast.Broadcast
-import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.functions._
-import org.slf4j.{Logger, LoggerFactory}
+import org.apache.spark.sql.{DataFrame, Row, SQLContext}
+import org.opennetworkinsight.utilities.{Entropy, Quantiles, TopDomains}
+import org.opennetworkinsight.utilities.{Entropy, Quantiles}
+import org.slf4j.Logger
 
 /**
   *
@@ -88,7 +88,7 @@ object ProxyPostLDA {
       Quantiles.computeDeciles(dataFrame.select("proxy_time").rdd.map(r => getTimeAsDouble(r(0).toString())))
 
     val entropyCuts = Quantiles.computeQuintiles(dataFrame.select("proxy_fulluri").
-      rdd.map({case Row(uri: String) => Utilities.stringEntropy(uri)}))
+      rdd.map({case Row(uri: String) => Entropy.stringEntropy(uri)}))
 
     val agentToCount: Map[String, Long] =
       dataFrame.select("proxy_useragent").rdd.map({case Row(ua: String) => (ua,1L)}).reduceByKey(_+_).collect().toMap

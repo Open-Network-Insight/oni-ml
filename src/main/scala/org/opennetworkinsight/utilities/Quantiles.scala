@@ -1,6 +1,7 @@
-package org.opennetworkinsight
+package org.opennetworkinsight.utilities
 
 import org.apache.spark.rdd.RDD
+
 import scala.math._
 
 /**

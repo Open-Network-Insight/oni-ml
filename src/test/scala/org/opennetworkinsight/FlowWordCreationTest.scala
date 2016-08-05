@@ -1,6 +1,7 @@
 package org.opennetworkinsight
 
 
+import org.opennetworkinsight.netflow.{FlowColumnIndex, FlowWordCreation}
 import org.scalatest.FlatSpec
 import org.scalatest.Matchers
 

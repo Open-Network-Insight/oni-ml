@@ -1,12 +1,12 @@
-package org.opennetworkinsight
+package org.opennetworkinsight.dns
 
-import org.opennetworkinsight.SuspiciousConnectsArgumentParser.Config
-
-import org.apache.spark.sql.SQLContext
 import org.apache.spark.SparkContext
+import org.apache.spark.sql.SQLContext
+import org.opennetworkinsight.OniLDACWrapper
+import org.opennetworkinsight.SuspiciousConnectsArgumentParser.Config
 import org.slf4j.Logger
 
-object DNSLDA {
+object DNSSuspiciousConnects {
 
   def run(config: Config, sparkContext: SparkContext, sqlContext: SQLContext, logger: Logger) = {
 
@@ -15,7 +15,7 @@ object DNSLDA {
     val docWordCount = DNSPreLDA.dnsPreLDA(config.inputPath, config.scoresFile, config.duplicationFactor, sparkContext,
       sqlContext, logger)
 
-    val (documentResults, wordResults) = LDAWrapper.runLDA(docWordCount, config.modelFile, config.topicDocumentFile, config.topicWordFile,
+    val (documentResults, wordResults) = OniLDACWrapper.runLDA(docWordCount, config.modelFile, config.topicDocumentFile, config.topicWordFile,
       config.mpiPreparationCmd, config.mpiCmd, config.mpiProcessCount, config.mpiTopicCount, config.localPath,
       config.ldaPath, config.localUser, config.dataSource, config.nodes)
 

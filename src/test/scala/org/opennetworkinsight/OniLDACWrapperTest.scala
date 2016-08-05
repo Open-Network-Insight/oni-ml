@@ -4,14 +4,14 @@ import org.opennetworkinsight.testutils.TestingSparkContextFlatSpec
 import org.scalatest.Matchers
 
 
-class LDAWrapperTest extends TestingSparkContextFlatSpec with Matchers{
+class OniLDACWrapperTest extends TestingSparkContextFlatSpec with Matchers{
 
 
   "normalizeWord" should "calculate exponential of each value in the input string, then sum up all the exponential and " +
     "then divide  each exponential by the total sum" in {
 
     val wordProbability = "1 2 3 4 5"
-    val result = LDAWrapper.normalizeWord(wordProbability)
+    val result = OniLDACWrapper.normalizeWord(wordProbability)
 
     result.length shouldBe 5
     result(0) shouldBe 0.011656230956039607
@@ -29,7 +29,7 @@ class LDAWrapperTest extends TestingSparkContextFlatSpec with Matchers{
       "0.0124531442 0.0124531442 0.0124531442 23983.5532262138 0.0124531442 0.0124531442 0.0124531442 0.0124531442 " +
       "0.0124531442 0.0124531442 22999.4716800747 0.0124531442"
 
-    var result = LDAWrapper.getTopicDocument(document, line)
+    var result = OniLDACWrapper.getTopicDocument(document, line)
 
     result shouldBe "192.168.1.1,2.6505498126219955E-7 2.6505498126219955E-7 2.6505498126219955E-7 2.6505498126219955E-7" +
       " 2.6505498126219955E-7 2.6505498126219955E-7 2.6505498126219955E-7 2.6505498126219955E-7 2.6505498126219955E-7" +
@@ -42,7 +42,7 @@ class LDAWrapperTest extends TestingSparkContextFlatSpec with Matchers{
     val document = "192.168.1.1"
     val line = "0.0 0.0 1.0 -1.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0"
 
-    val result = LDAWrapper.getTopicDocument(document, line)
+    val result = OniLDACWrapper.getTopicDocument(document, line)
 
     result shouldBe "192.168.1.1,0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0"
   }
@@ -62,7 +62,7 @@ class LDAWrapperTest extends TestingSparkContextFlatSpec with Matchers{
 
     val distinctDocument = documentWordData.map(row => row(0)).distinct.collect
 
-    val model = LDAWrapper.createModel(documentWordData, wordDictionary, distinctDocument)
+    val model = OniLDACWrapper.createModel(documentWordData, wordDictionary, distinctDocument)
 
     model should contain ("2 0:8 3:5")
     model should contain ("1 1:4")
@@ -89,7 +89,7 @@ class LDAWrapperTest extends TestingSparkContextFlatSpec with Matchers{
       "0.0124531442 0.0124531442 0.0124531442 0.0124531442 0.0124531442 0.0124531442 0.0124531442 12.0124531442 " +
       "0.0124531442 0.0124531442 0.0124531442 0.0124531442")
 
-    val results = LDAWrapper.getDocumentResults(topicDocumentData, documentDictionary)
+    val results = OniLDACWrapper.getDocumentResults(topicDocumentData, documentDictionary)
 
     results(0) shouldBe "66.23.45.11,2.6505498126219955E-7 2.6505498126219955E-7 2.6505498126219955E-7 2.6505498126219955E-7 " +
       "2.6505498126219955E-7 2.6505498126219955E-7 2.6505498126219955E-7 2.6505498126219955E-7 2.6505498126219955E-7 " +
@@ -135,7 +135,7 @@ class LDAWrapperTest extends TestingSparkContextFlatSpec with Matchers{
     "-535.7333037656 -532.2623144682 -528.2020876890 -532.0482294927",
     "-18.4350359818 -534.4612736041 -530.4010468817 -11.0784977885")
 
-    val results = LDAWrapper.getWordResults(topicWordData, wordDictionary)
+    val results = OniLDACWrapper.getWordResults(topicWordData, wordDictionary)
 
     results.length shouldBe 4
     results(0).split(" ").length shouldBe 20

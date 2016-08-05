@@ -1,11 +1,11 @@
-package org.opennetworkinsight
+package org.opennetworkinsight.utilities
 
 import scala.math._
 
 /**
   * Created by nlsegerl on 8/4/16.
   */
-object Utilities {
+object Entropy {
 
   /**
     * Calculates the "entropy" in string, interpreted as a distribution on its constituent characters.
