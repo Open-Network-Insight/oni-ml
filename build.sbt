@@ -3,7 +3,6 @@ name := "oni-ml"
 version := "1.1"
 
 scalaVersion := "2.10.5"
-scalacOptions += "-target:jvm-1.7"
 
 import AssemblyKeys._
 

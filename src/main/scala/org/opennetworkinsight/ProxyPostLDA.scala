@@ -29,7 +29,7 @@ object ProxyPostLDA {
     }).map({case (word, probPerTopic)  => word -> probPerTopic}).toMap
 
 
-    val dataFrame = sqlContext.parquetFile(inputPath)
+    val rawDataDF = sqlContext.parquetFile(inputPath)
       .filter("proxy_date is not null and proxy_time is not null and proxy_clientip is not null")
       .select("proxy_date",
         "proxy_time",
@@ -52,12 +52,12 @@ object ProxyPostLDA {
         "proxy_fulluri")
 
     logger.info("Computing conditional probability")
-    val scoredDF : DataFrame = score(sc, dataFrame, topicCount, ipToTopicMix, wordsToProbPerTopic)
+    val scoredDF : DataFrame = score(sc, rawDataDF, topicCount, ipToTopicMix, wordsToProbPerTopic)
 
-    val filteredDf = scoredDF.filter("score < " + threshold)
+    val filteredDF = scoredDF.filter("score < " + threshold)
     logger.info("Persisting data")
 
-    val scored = filteredDf.sort("score").rdd.map(_.mkString(",")).saveAsTextFile(resultsFilePath)
+    val scored = filteredDF.sort("score").rdd.map(_.mkString(",")).saveAsTextFile(resultsFilePath)
 
     logger.info("proxy post LDA completed")
   }
