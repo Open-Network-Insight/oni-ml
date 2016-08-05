@@ -112,13 +112,10 @@ object FlowPostLDA {
     val scored = src_scored.filter(elem => elem._1 < threshold).sortByKey().map(row => row._2.mkString(","))
 
     logger.info("Persisting data")
-    //scored.persist(StorageLevel.MEMORY_AND_DISK)
+
     scored.saveAsTextFile(resultsFilePath)
 
-    sc.stop()
     logger.info("Flow post LDA completed")
-    //      }
-    //      case None => println("Error parsing arguments")
-    //    }
+
   }
 }

@@ -88,7 +88,7 @@ object DNSPostLDA {
     addcol("subdomain.length")
     addcol("num.periods")
 
-    data_with_subdomains = data_with_subdomains.map(data => data :+ DNSWordCreation.entropy(data(col("subdomain"))).toString)
+    data_with_subdomains = data_with_subdomains.map(data => data :+ Utilities.stringEntropy(data(col("subdomain"))).toString)
     addcol("subdomain.entropy")
 
     logger.info("calculating time cuts ...")

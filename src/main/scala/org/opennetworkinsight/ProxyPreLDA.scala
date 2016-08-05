@@ -1,13 +1,16 @@
 package org.opennetworkinsight
 
-
 import org.apache.log4j.{Level, Logger => apacheLogger}
 import org.apache.spark.rdd.RDD
-import org.apache.spark.sql.SQLContext
+import org.apache.spark.sql.{DataFrame, Row, SQLContext}
 import org.apache.spark.{SparkConf, SparkContext}
 import org.slf4j.{Logger, LoggerFactory}
 import org.apache.spark.sql.types._
+import org.apache.spark.sql._
+import org.apache.spark.sql.functions._
 import org.apache.spark.storage.StorageLevel
+import org.apache.spark.broadcast.Broadcast
+import scala.io.Source
 
 /**
   * Contains routines for creating the "words" for a suspicious connects analysis from incoming proxy records.
@@ -15,31 +18,19 @@ import org.apache.spark.storage.StorageLevel
 
 object ProxyPreLDA {
 
-  def getColumnNames(input: Array[String], sep: Char = ','): scala.collection.mutable.Map[String, Int] = {
-    val columns = scala.collection.mutable.Map[String, Int]()
-    val header = input.zipWithIndex
-    header.foreach(tuple => columns(tuple._1) = tuple._2)
-    columns
-  }
 
-  def proxyPreLDA(inputPath: String, feedbackFile: String, duplicationFactor: Int,
-                  sc: SparkContext, sqlContext: SQLContext, logger: Logger): RDD[String] = {
+  def getIPWordCounts(inputPath: String, feedbackFile: String, duplicationFactor: Int,
+                      sc: SparkContext, sqlContext: SQLContext, logger: Logger): RDD[String] = {
+
+    import sqlContext.implicits._
 
     logger.info("Proxy pre LDA starts")
 
-    var dataframeColumns = new Array[String](0)
-
     val feedbackFileExists = new java.io.File(feedbackFile).exists
 
-    val multidata = {
-      var df = sqlContext.parquetFile(inputPath.split(",")(0)).filter("proxy_date is not null and proxy_time is not null and proxy_clientip is not null")
-      val files = inputPath.split(",")
-      for ((file, index) <- files.zipWithIndex) {
-        if (index > 1) {
-          df = df.unionAll(sqlContext.parquetFile(file).filter("proxy_date is not null and proxy_time is not null and proxy_clientip is not null"))
-        }
-      }
-      df = df.select("proxy_date",
+    val dataFrame = sqlContext.parquetFile(inputPath).
+      filter("proxy_date is not null and proxy_time is not null and proxy_clientip is not null").
+      select("proxy_date",
         "proxy_time",
         "proxy_clientip",
         "proxy_host",
@@ -48,49 +39,64 @@ object ProxyPreLDA {
         "proxy_resconttype",
         "proxy_respcode",
         "proxy_fulluri")
-      dataframeColumns = df.columns
-      val tempRDD: org.apache.spark.rdd.RDD[String] = df.map(_.mkString(","))
-      tempRDD
+
+
+    // TBD: incorporate feedback data
+
+
+    val topDomains : Broadcast[Set[String]] = sc.broadcast(TopDomains.topDomains)
+
+    def getTimeAsDouble(timeStr: String) = {
+      val s = timeStr.split(":")
+      val hours = s(0).toInt
+      val minutes = s(1).toInt
+      val seconds = s(2).toInt
+
+      (3600*hours + 60*minutes + seconds).toDouble
     }
 
-    val col = getColumnNames(dataframeColumns)
 
-    def addcol(colname: String) = if (!col.keySet.contains(colname)) {
-      col(colname) = col.values.max + 1
-    }
-    if (feedbackFile != "None") {
-      addcol("feedback")
-    }
 
-    val rawdata :org.apache.spark.rdd.RDD[String] = {
-      if (!feedbackFileExists) { multidata
-      }else {
-        multidata
-      }
-    }
+    val timeCuts =
+      Quantiles.computeDeciles(dataFrame.select("proxy_time").rdd.map({case Row(t: String) => getTimeAsDouble(t)}))
 
-    var data = rawdata.map(line => line.split(",")).filter(line => line.length == dataframeColumns.length).map(line => {
-      if (feedbackFile != "None") {
-        line :+ "None"
-      } else {
-        line
-      }
-    })
+    val entropyCuts = Quantiles.computeQuintiles(dataFrame.select("proxy_fulluri").
+      rdd.map({case Row(uri: String) => Utilities.stringEntropy(uri)}))
 
-    logger.info("Adding words")
-    data = data.map(row => {
-      row :+ ProxyWordCreation.proxyWord(row(col("proxy_host")),
-        row(col("proxy_reqmethod")),
-        row(col("proxy_respcode")),
-        row(col("proxy_fulluri")))
-    })
-    addcol("word")
+    val agentToCount: Map[String, Long] =
+      dataFrame.select("proxy_useragent").rdd.map({case Row(ua: String) => (ua,1L)}).reduceByKey(_+_).collect().toMap
 
-    val wc = data.map(row => ((row(col("proxy_clientip")) , row(col("word"))), 1)).reduceByKey(_ + _).map({case ((ip, word), count) => List(ip, word, count).mkString(",")})
+    val agentToCountBC = sc.broadcast(agentToCount)
 
+    val agentCuts = Quantiles.computeQuintiles(dataFrame.select("proxy_useragent").rdd.map({case Row(ua: String) => agentToCountBC.value(ua)}))
+
+    val wc = ipWordCountFromDF(dataFrame, topDomains, agentToCountBC, timeCuts, entropyCuts, agentCuts)
     logger.info("proxy pre LDA completed")
 
     wc
+  }
+
+  def ipWordCountFromDF(dataFrame: DataFrame,
+                        topDomains: Broadcast[Set[String]],
+                        agentToCountBC: Broadcast[Map[String, Long]],
+                        timeCuts: Array[Double],
+                        entropyCuts: Array[Double],
+                        agentCuts: Array[Double]) : RDD[String] = {
+
+    val udfWordCreation = ProxyWordCreation.udfWordCreation(topDomains, agentToCountBC,  timeCuts, entropyCuts, agentCuts)
+
+    val ipWordDF = dataFrame.withColumn("word",
+      udfWordCreation(dataFrame("proxy_host"),
+        dataFrame("proxy_time"),
+        dataFrame("proxy_reqmethod"),
+        dataFrame("proxy_fulluri"),
+        dataFrame("proxy_resconttype"),
+        dataFrame("proxy_useragent"),
+        dataFrame("proxy_respcode"))).
+      select("proxy_clientip", "word")
+
+
+    ipWordDF.map({case Row(ip, word) => ((ip, word), 1)}).reduceByKey(_ + _).map({ case ((ip, word), count) => List(ip, word, count).mkString(",") })
   }
 }
 

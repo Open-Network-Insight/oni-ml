@@ -23,7 +23,6 @@ object LDAWrapper {
   (Array[String], Array[String])
   =
   {
-
     val documentWordData = docWordCount.map(_.split(","))
     // Create word Map Word,Index for further usage
     val wordDictionary: Map[String, Int] = {
@@ -68,8 +67,9 @@ object LDAWrapper {
       stringToProcess(mpiPreparationCmd).!!
 
     // Execute MPI
+
     sys.process.Process(Seq(mpiCmd, "-n", mpiProcessCount, "-f", "machinefile", "./lda", "est", "2.5",
-      mpiTopicCount, "settings.txt", mpiProcessCount, modelFile, "random", localPath), new java.io.File(ldaPath)).!!
+      mpiTopicCount, "settings.txt", mpiProcessCount, modelFile, "random", localPath), new java.io.File(ldaPath)) #> (System.out) !!
 
     // Read topic info per document
 

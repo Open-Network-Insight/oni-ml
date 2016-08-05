@@ -77,6 +77,7 @@ hdfs dfs -rm -R -f ${HDFS_SCORED_CONNECTS}
 # In this script, after the line after --mpicmd ${MPI_CMD} add:
 # --mpiprep ${MPI_PREP_CMD}
 
+${MPI_PREP_CMD}
 
 time spark-submit --class "org.opennetworkinsight.SuspiciousConnects" --master yarn-client --executor-memory  ${SPK_EXEC_MEM} \
   --driver-memory 2g --num-executors ${SPK_EXEC} --executor-cores 1 --conf spark.shuffle.io.preferDirectBufs=false    \

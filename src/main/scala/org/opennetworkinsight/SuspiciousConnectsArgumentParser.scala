@@ -2,7 +2,7 @@ package org.opennetworkinsight
 
 
 /**
-  *
+  * Parses arguments for the suspicious connections analysis.
   */
 object SuspiciousConnectsArgumentParser {
 
@@ -25,7 +25,7 @@ object SuspiciousConnectsArgumentParser {
                     hdfsScoredConnect: String = "",
                     threshold: Double = 1.0d)
 
-  def getParser(): scopt.OptionParser[Config] = new scopt.OptionParser[Config]("LDA") {
+  val parser: scopt.OptionParser[Config] = new scopt.OptionParser[Config]("LDA") {
 
     head("LDA Process", "1.1")
 

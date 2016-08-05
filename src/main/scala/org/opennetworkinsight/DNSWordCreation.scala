@@ -79,14 +79,6 @@ import scala.math._
       bin.toString
     }
 
-    def entropy(v: String): Double = {
-      v
-        .groupBy(a => a)
-        .values
-        .map(i => i.length.toDouble / v.length)
-        .map(p => -p * log10(p) / log10(2))
-        .sum
-    }
   }
 
 

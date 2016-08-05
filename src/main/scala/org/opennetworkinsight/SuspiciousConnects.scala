@@ -11,15 +11,12 @@ import org.opennetworkinsight.SuspiciousConnectsArgumentParser.Config
   */
 object SuspiciousConnects {
 
-
   def main(args: Array[String]) {
 
-    val parser = SuspiciousConnectsArgumentParser.getParser()
-
+    val parser = SuspiciousConnectsArgumentParser.parser
 
     parser.parse(args, Config()) match {
       case Some(config) => {
-
         val logger = LoggerFactory.getLogger(this.getClass)
         Logger.getLogger("org").setLevel(Level.OFF)
         Logger.getLogger("akka").setLevel(Level.OFF)
@@ -30,10 +27,9 @@ object SuspiciousConnects {
         val sqlContext = new SQLContext(sparkContext)
 
         analysis match {
-
           case "flow" => FlowLDA.run(config, sparkContext, sqlContext, logger)
           case "dns" => DNSLDA.run(config, sparkContext, sqlContext, logger)
-          case "proxy" => ProxyLDA.run(config, sparkContext, sqlContext, logger)
+          case "proxy" => ProxySuspiciousConnects.run(config, sparkContext, sqlContext, logger)
           case _ => println("ERROR:  unsupported (or misspelled) analysis: " + analysis)
         }
 
@@ -44,5 +40,4 @@ object SuspiciousConnects {
 
     System.exit(0)
   }
-
 }
