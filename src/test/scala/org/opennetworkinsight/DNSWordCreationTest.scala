@@ -116,7 +116,7 @@ class DNSWordCreationTest extends TestingSparkContextFlatSpec with Matchers{
   "entropy" should "return 2.807354922057603 with value abcdefg" in {
     val value = "abcdefg"
 
-    val result = DNSWordCreation.entropy(value)
+    val result = Utilities.stringEntropy(value)
 
     result shouldBe 2.807354922057604
   }

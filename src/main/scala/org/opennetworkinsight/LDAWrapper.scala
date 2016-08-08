@@ -23,7 +23,6 @@ object LDAWrapper {
   (Array[String], Array[String])
   =
   {
-
     val documentWordData = docWordCount.map(_.split(","))
     // Create word Map Word,Index for further usage
     val wordDictionary: Map[String, Int] = {
@@ -35,13 +34,13 @@ object LDAWrapper {
       words.zipWithIndex.toMap
     }
 
-    val distinctDocument = documentWordData.map(row => row(0)).distinct
-    distinctDocument.cache()
+    val distinctDocument = documentWordData.map(row => row(0)).distinct.collect
+    //distinctDocument.cache()
 
     // Create document Map Index, Document for further usage
     val documentDictionary: Map[Int, String] = {
       distinctDocument
-        .collect
+        //.collect
         .zipWithIndex
         .sortBy(_._2)
         .map(kv => (kv._2, kv._1))
@@ -68,8 +67,9 @@ object LDAWrapper {
       stringToProcess(mpiPreparationCmd).!!
 
     // Execute MPI
+
     sys.process.Process(Seq(mpiCmd, "-n", mpiProcessCount, "-f", "machinefile", "./lda", "est", "2.5",
-      mpiTopicCount, "settings.txt", mpiProcessCount, modelFile, "random", localPath), new java.io.File(ldaPath)).!!
+      mpiTopicCount, "settings.txt", mpiProcessCount, modelFile, "random", localPath), new java.io.File(ldaPath)) #> (System.out) !!
 
     // Read topic info per document
 
@@ -129,7 +129,7 @@ object LDAWrapper {
     }
   }
 
-  def createModel(documentWordData: RDD[Array[String]], wordDictionary: Map[String, Int], distinctDocument: RDD[String])
+  def createModel(documentWordData: RDD[Array[String]], wordDictionary: Map[String, Int], distinctDocument: Array[String])
   : Array[String]
   = {
     val documentCount = documentWordData
@@ -147,7 +147,7 @@ object LDAWrapper {
       .toMap
 
     distinctDocument
-      .collect
+      //.collect
       .map(doc => documentCount(doc)
         + " "
         + wordIndexdocWordCount(doc))

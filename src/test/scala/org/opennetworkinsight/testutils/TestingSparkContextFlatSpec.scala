@@ -5,14 +5,17 @@
 package org.opennetworkinsight.testutils
 
 import org.apache.spark.SparkContext
+import org.apache.spark.sql.SQLContext
 import org.scalatest.{BeforeAndAfter, FlatSpec}
 
 trait TestingSparkContextFlatSpec extends FlatSpec with BeforeAndAfter {
 
   var sparkContext: SparkContext = null
+  var sqlContext : SQLContext = null
 
   before {
     sparkContext = TestingSparkContext.sparkContext
+    sqlContext = new SQLContext(sparkContext)
   }
 
   /**
