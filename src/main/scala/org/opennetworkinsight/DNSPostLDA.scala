@@ -4,7 +4,7 @@ package org.opennetworkinsight
 import org.apache.spark.sql.SQLContext
 import org.apache.spark.storage.StorageLevel
 import org.apache.spark.SparkContext
-import org.opennetworkinsight.LDAArgumentParser.Config
+import org.opennetworkinsight.SuspiciousConnectsArgumentParser.Config
 import org.slf4j.Logger
 
 import scala.io.Source
@@ -88,7 +88,7 @@ object DNSPostLDA {
     addcol("subdomain.length")
     addcol("num.periods")
 
-    data_with_subdomains = data_with_subdomains.map(data => data :+ DNSWordCreation.entropy(data(col("subdomain"))).toString)
+    data_with_subdomains = data_with_subdomains.map(data => data :+ Utilities.stringEntropy(data(col("subdomain"))).toString)
     addcol("subdomain.entropy")
 
     logger.info("calculating time cuts ...")

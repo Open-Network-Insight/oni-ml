@@ -92,4 +92,8 @@ object Quantiles extends Serializable {
   def computeQuintiles(data: RDD[Double]): Array[Double] = computeQuantiles(data, QUINTILES)
   val QUINTILES = Array(0.2, 0.4, 0.6, 0.8, 1.0)
 
+
+  def bin(value: Double, cuts: Array[Double]) : Int = {
+    cuts.indexWhere(cut => value <= cut)
+  }
 }

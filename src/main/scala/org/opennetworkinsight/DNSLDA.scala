@@ -1,6 +1,6 @@
 package org.opennetworkinsight
 
-import org.opennetworkinsight.LDAArgumentParser.Config
+import org.opennetworkinsight.SuspiciousConnectsArgumentParser.Config
 
 import org.apache.spark.sql.SQLContext
 import org.apache.spark.SparkContext
@@ -15,12 +15,12 @@ object DNSLDA {
     val docWordCount = DNSPreLDA.dnsPreLDA(config.inputPath, config.scoresFile, config.duplicationFactor, sparkContext,
       sqlContext, logger)
 
-    val ldaResult = LDAWrapper.runLDA(docWordCount, config.modelFile, config.topicDocumentFile, config.topicWordFile,
+    val (documentResults, wordResults) = LDAWrapper.runLDA(docWordCount, config.modelFile, config.topicDocumentFile, config.topicWordFile,
       config.mpiPreparationCmd, config.mpiCmd, config.mpiProcessCount, config.mpiTopicCount, config.localPath,
       config.ldaPath, config.localUser, config.dataSource, config.nodes)
 
-    DNSPostLDA.dnsPostLDA(config.inputPath, config.hdfsScoredConnect, config.threshold, ldaResult("document_results"),
-      ldaResult("word_results"), sparkContext, sqlContext, logger)
+    DNSPostLDA.dnsPostLDA(config.inputPath, config.hdfsScoredConnect, config.threshold, documentResults,
+      wordResults, sparkContext, sqlContext, logger)
 
     logger.info("DNS LDA completed")
   }
