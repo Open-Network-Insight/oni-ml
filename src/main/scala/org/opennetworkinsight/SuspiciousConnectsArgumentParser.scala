@@ -23,7 +23,9 @@ object SuspiciousConnectsArgumentParser {
                     dataSource: String = "",
                     nodes: String = "",
                     hdfsScoredConnect: String = "",
-                    threshold: Double = 1.0d)
+                    threshold: Double = 1.0d,
+                    kMostSuspicious: Int = 100,
+                    useKMostSuspicious: Boolean = false)
 
   val parser: scopt.OptionParser[Config] = new scopt.OptionParser[Config]("LDA") {
 
@@ -100,5 +102,9 @@ object SuspiciousConnectsArgumentParser {
     opt[Double]('e', "threshold").required().valueName("float64").
       action((x, c) => c.copy(threshold = x)).
       text("probability threshold for declaring anomalies")
+
+    opt[Int]('k', "topmost").required().valueName("integer").
+      action((x, c) => c.copy(kMostSuspicious = x, useKMostSuspicious = true)).
+      text("number of most suspicious connections to return")
   }
 }
