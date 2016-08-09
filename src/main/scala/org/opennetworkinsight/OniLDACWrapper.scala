@@ -15,7 +15,7 @@ import scala.sys.process._
   * 4. Calculates and returns probability of word given topic: p(w|z)
   */
 
-object LDAWrapper {
+object OniLDACWrapper {
 
   def runLDA(docWordCount: RDD[String], modelFile: String, topicDocumentFile: String, topicWordFile: String,
              mpiPreparationCmd: String, mpiCmd: String, mpiProcessCount: String, mpiTopicCount: String,

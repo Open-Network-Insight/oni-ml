@@ -1,4 +1,4 @@
-package org.opennetworkinsight
+package org.opennetworkinsight.netflow
 
 import org.apache.spark.rdd.RDD
 

@@ -1,14 +1,10 @@
-package org.opennetworkinsight
+package org.opennetworkinsight.dns
 
-import org.slf4j.Logger
-
+import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.SQLContext
-import org.apache.spark.{SparkConf, SparkContext}
-import org.apache.spark.sql.types._
-import org.apache.spark.storage.StorageLevel
-
-import org.opennetworkinsight.SuspiciousConnectsArgumentParser.Config
+import org.opennetworkinsight.utilities.{Entropy, Quantiles}
+import org.slf4j.Logger
 
 import scala.io.Source
 
@@ -165,7 +161,7 @@ object DNSPreLDA {
     addcol("subdomain.length")
     addcol("num.periods")
 
-    data_with_subdomains = data_with_subdomains.map(data => data :+ Utilities.stringEntropy(data(col("subdomain"))).toString)
+    data_with_subdomains = data_with_subdomains.map(data => data :+ Entropy.stringEntropy(data(col("subdomain"))).toString)
     addcol("subdomain.entropy")
 
     logger.info("Calculating time cuts ...")

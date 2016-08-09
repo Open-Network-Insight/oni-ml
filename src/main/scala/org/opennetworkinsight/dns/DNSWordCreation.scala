@@ -1,8 +1,6 @@
-package org.opennetworkinsight
+package org.opennetworkinsight.dns
 
 import org.apache.spark.broadcast.Broadcast
-
-import scala.math._
 
   object DNSWordCreation {
 

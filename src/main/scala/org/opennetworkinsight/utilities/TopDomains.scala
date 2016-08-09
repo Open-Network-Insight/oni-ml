@@ -1,4 +1,4 @@
-package org.opennetworkinsight
+package org.opennetworkinsight.utilities
 
 import scala.io.Source
 

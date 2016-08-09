@@ -1,6 +1,7 @@
 package org.opennetworkinsight
 
 import org.apache.spark.rdd.RDD
+import org.opennetworkinsight.utilities.Quantiles
 import org.scalatest.Matchers
 import testutils.TestingSparkContextFlatSpec
 

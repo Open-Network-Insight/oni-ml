@@ -1,13 +1,13 @@
-package org.opennetworkinsight
+package org.opennetworkinsight.netflow
 
 import breeze.linalg._
-import org.apache.log4j.{Level, Logger => apacheLogger}
+import org.apache.log4j.{Logger => apacheLogger}
+import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
-import org.apache.spark.storage.StorageLevel
-import org.apache.spark.{SparkConf, SparkContext}
 import org.apache.spark.sql.SQLContext
+import org.opennetworkinsight.utilities.Quantiles
+import org.opennetworkinsight.netflow.{FlowColumnIndex => indexOf}
 import org.slf4j.Logger
-import org.opennetworkinsight.{FlowColumnIndex => indexOf}
 
 /**
   * Contains routines for scoring incoming netflow records from a netflow suspicious connections model.

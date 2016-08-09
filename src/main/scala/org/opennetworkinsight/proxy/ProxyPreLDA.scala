@@ -1,16 +1,13 @@
-package org.opennetworkinsight
+package org.opennetworkinsight.proxy
 
-import org.apache.log4j.{Level, Logger => apacheLogger}
+import org.apache.log4j.{Logger => apacheLogger}
+import org.apache.spark.SparkContext
+import org.apache.spark.broadcast.Broadcast
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.{DataFrame, Row, SQLContext}
-import org.apache.spark.{SparkConf, SparkContext}
-import org.slf4j.{Logger, LoggerFactory}
-import org.apache.spark.sql.types._
-import org.apache.spark.sql._
-import org.apache.spark.sql.functions._
-import org.apache.spark.storage.StorageLevel
-import org.apache.spark.broadcast.Broadcast
-import scala.io.Source
+import org.opennetworkinsight.utilities.{Entropy, Quantiles, TopDomains}
+import org.opennetworkinsight.utilities.{Entropy, Quantiles}
+import org.slf4j.Logger
 
 /**
   * Contains routines for creating the "words" for a suspicious connects analysis from incoming proxy records.
@@ -21,8 +18,6 @@ object ProxyPreLDA {
 
   def getIPWordCounts(inputPath: String, feedbackFile: String, duplicationFactor: Int,
                       sc: SparkContext, sqlContext: SQLContext, logger: Logger): RDD[String] = {
-
-    import sqlContext.implicits._
 
     logger.info("Proxy pre LDA starts")
 
@@ -61,7 +56,7 @@ object ProxyPreLDA {
       Quantiles.computeDeciles(rawDataDF.select("proxy_time").rdd.map({case Row(t: String) => getTimeAsDouble(t)}))
 
     val entropyCuts = Quantiles.computeQuintiles(rawDataDF.select("proxy_fulluri").
-      rdd.map({case Row(uri: String) => Utilities.stringEntropy(uri)}))
+      rdd.map({case Row(uri: String) => Entropy.stringEntropy(uri)}))
 
     val agentToCount: Map[String, Long] =
       rawDataDF.select("proxy_useragent").rdd.map({case Row(ua: String) => (ua,1L)}).reduceByKey(_+_).collect().toMap
