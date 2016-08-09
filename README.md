@@ -139,15 +139,13 @@ and
 ```
 ### oni-ml output
 
-A successful run of oni-ml will create and populate a directory at `LPATH/YYYYMMDD` where `YYYYMMDD` is the date argument provided to `ml_ops.sh`
+Final results are stored in the following file on HDFS:
+`HPATH\scores\SOURCE_results.csv` 
+It is a csv file in which network events annotated with estimated probabilities and sorted in ascending order.
 
-This directory will contain the following files:
+A successful run of oni-ml will also create and populate a directory at `LPATH/YYYYMMDD` where `YYYYMMDD` is the date argument provided to `ml_ops.sh` 
+This directory will contain the following files generated during the LDA procedure used for topic-modelling:
 
-- flow_results.csv Network events annotated with estimated probabilities and sorted in ascending order.
-- doc_results.csv  The per-document topic-mix scores. Each line represents the topic mix of a document. First entry is the document (an IP), and this is separated from the remainder by a comma. The remainder is a space-separated list of floating point numbers that sums to 1.0. The number at position k is the fraction of the document assigned to topic k.
-- word_results.csv The per-word probability by topic scores. Each line represent the conditional probabilities of a word. First entry is the word (a summarized network event), and this is separated from the remainder by a comma. The remainder of the line is a space-separated list of floating-point numbers. The number at position k is the probability of seeing this word conditioned on being in topic k.
-- doc.dat An intermediate file mapping integers to IP addresses.
-- words.dat An intermediate file mapping integers to the network event "words"
 - model.dat An intermediate file in which each line corresponds to a "document" (the flow traffic about an IP, or the DNS queries of a client IP), and contains the size of the document and the list of "words" (simplified network events) occurring in the document with their frequencies. Words are encoded as integers per the file words.dat. 
 - final.beta  A space-separated text file that contains the logs of the probabilities of each word given each topic. Each line corresponds to a topic and the words are columns. 
 - final.gamma A space-separated text file that contains the unnormalized probabilities of each topic given each document. Each line corresponds to a document and the topics are the columns.
