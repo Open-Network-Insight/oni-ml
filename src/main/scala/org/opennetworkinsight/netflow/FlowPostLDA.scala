@@ -14,7 +14,7 @@ import org.slf4j.Logger
   */
 object FlowPostLDA {
 
-  def flowPostLDA(inputPath: String, resultsFilePath: String, threshold: Double, documentResults: Array[String],
+  def flowPostLDA(inputPath: String, resultsFilePath: String, threshold: Double, topK: Int, documentResults: Array[String],
                   wordResults: Array[String], sc: SparkContext, sqlContext: SQLContext, logger: Logger) = {
 
     var ibyt_cuts = new Array[Double](10)
@@ -109,7 +109,18 @@ object FlowPostLDA {
       (min(src_score, dest_score), row :+ src_score :+ dest_score)
     })
 
-    val scored = src_scored.filter(elem => elem._1 < threshold).sortByKey().map(row => row._2.mkString(","))
+
+
+    val filteredSorted = src_scored.filter(elem => elem._1 < threshold).sortByKey()
+
+    val count = filteredSorted.count
+
+    val takeCount  = if (topK == -1 || count < topK) {
+      count.toInt
+    } else {
+      topK
+    }
+    val scored : RDD[String] =  sc.parallelize(filteredSorted.take(takeCount).map(row => row._2.mkString("\t")))
 
     logger.info("Persisting data")
 

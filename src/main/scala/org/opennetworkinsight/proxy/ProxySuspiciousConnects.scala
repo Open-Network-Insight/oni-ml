@@ -20,10 +20,11 @@ object ProxySuspiciousConnects {
 
     val (documentResults, wordResults) = OniLDACWrapper.runLDA(docWordCount, config.modelFile, config.topicDocumentFile, config.topicWordFile,
       config.mpiPreparationCmd, config.mpiCmd, config.mpiProcessCount, config.mpiTopicCount, config.localPath,
-      config.ldaPath, config.localUser,  config.dataSource, config.nodes)
+      config.ldaPath, config.localUser,  config.analysis, config.nodes)
 
     val topicCount  = 20
-    ProxyPostLDA.getResults(config.inputPath, config.hdfsScoredConnect, topicCount,  config.threshold, documentResults,
+    ProxyPostLDA.getResults(config.inputPath, config.hdfsScoredConnect, topicCount,  config.threshold,
+      config.maxResults, documentResults,
       wordResults, sparkContext, sqlContext, logger)
 
     logger.info("Proxy suspcicious connects completed")

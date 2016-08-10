@@ -24,8 +24,7 @@ object SuspiciousConnectsArgumentParser {
                     nodes: String = "",
                     hdfsScoredConnect: String = "",
                     threshold: Double = 1.0d,
-                    kMostSuspicious: Int = 100,
-                    useKMostSuspicious: Boolean = false)
+                    maxResults: Int = -1)
 
   val parser: scopt.OptionParser[Config] = new scopt.OptionParser[Config]("LDA") {
 
@@ -37,7 +36,7 @@ object SuspiciousConnectsArgumentParser {
 
     opt[String]('i', "input").required().valueName("<hdfs path>").
       action((x, c) => c.copy(inputPath = x)).
-      text("HDFS path to netflow records")
+      text("HDFS path to input")
 
     opt[String]('f', "feedback").valueName("<local file>").
       action((x, c) => c.copy(scoresFile = x)).
@@ -87,15 +86,12 @@ object SuspiciousConnectsArgumentParser {
       action((x, c) => c.copy(localUser = x)).
       text("Local user path")
 
-    opt[String]('s', "dsource").required().valueName("<input param>").
-      action((x, c) => c.copy(dataSource = x)).
-      text("Data source")
 
     opt[String]('n', "nodes").required().valueName("<input param>").
       action((x, c) => c.copy(nodes = x)).
       text("Node list")
 
-    opt[String]('h', "scored").required().valueName("<hdfs path>").
+    opt[String]('s', "scored").required().valueName("<hdfs path>").
       action((x, c) => c.copy(hdfsScoredConnect = x)).
       text("HDFS path for results")
 
@@ -103,8 +99,8 @@ object SuspiciousConnectsArgumentParser {
       action((x, c) => c.copy(threshold = x)).
       text("probability threshold for declaring anomalies")
 
-    opt[Int]('k', "topmost").required().valueName("integer").
-      action((x, c) => c.copy(kMostSuspicious = x, useKMostSuspicious = true)).
+    opt[Int]('k', "maxresults").required().valueName("integer").
+      action((x, c) => c.copy(maxResults = x)).
       text("number of most suspicious connections to return")
   }
 }

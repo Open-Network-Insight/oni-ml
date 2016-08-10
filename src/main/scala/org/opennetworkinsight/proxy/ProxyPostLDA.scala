@@ -13,7 +13,7 @@ import org.slf4j.Logger
   */
 object ProxyPostLDA {
 
-  def getResults(inputPath: String, resultsFilePath: String, topicCount: Int, threshold: Double,
+  def getResults(inputPath: String, resultsFilePath: String, topicCount: Int, threshold: Double, topK: Int,
                  documentResults: Array[String],  wordResults: Array[String],
                  sc: SparkContext, sqlContext: SQLContext, logger: Logger) = {
 
@@ -54,9 +54,22 @@ object ProxyPostLDA {
     val scoredDF : DataFrame = score(sc, rawDataDF, topicCount, ipToTopicMix, wordsToProbPerTopic)
 
     val filteredDF = scoredDF.filter("score < " + threshold)
+
+    val sortedDF = filteredDF.sort("score")
+
+    val count = sortedDF.count
+
+    val takeCount  = if (topK == -1 || count < topK) {
+      count.toInt
+    } else {
+      topK
+    }
+
+    val outRDD = sc.parallelize(sortedDF.take(takeCount))
+    outRDD.map(_.mkString("\t")).saveAsTextFile(resultsFilePath)
+
     logger.info("Persisting data")
 
-    val scored = filteredDF.sort("score").rdd.map(_.mkString(",")).saveAsTextFile(resultsFilePath)
 
     logger.info("proxy post LDA completed")
   }

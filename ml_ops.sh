@@ -29,6 +29,11 @@ source /etc/duxbay.conf
 
 if [ -n "$3" ]; then TOL=$3 ; fi
 
+if [ -n "$4" ]; then
+    MAXRESULTS=$4
+else
+    MAXRESULTS=-1
+fi
 
 # prepare parameters pipeline stages
 
@@ -95,10 +100,10 @@ time spark-submit --class "org.opennetworkinsight.SuspiciousConnects" --master y
   --mpicmd ${MPI_CMD}  \
   --proccount ${PROCESS_COUNT} \
   --topiccount ${TOPIC_COUNT} \
-  --dsource ${DSOURCE} \
   --nodes ${nodes} \
   --scored ${HDFS_SCORED_CONNECTS} \
-  --threshold ${TOL}
+  --threshold ${TOL} \
+  --maxresults ${MAXRESULTS}
 
 wait
 

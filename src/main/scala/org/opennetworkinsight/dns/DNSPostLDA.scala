@@ -2,6 +2,7 @@
 package org.opennetworkinsight.dns
 
 import org.apache.spark.SparkContext
+import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.SQLContext
 import org.opennetworkinsight.utilities.{Entropy, Quantiles}
 import org.slf4j.Logger
@@ -13,7 +14,7 @@ import scala.io.Source
   */
 object DNSPostLDA {
 
-  def dnsPostLDA(inputPath: String, resultsFilePath: String, threshold: Double, documentResults: Array[String],
+  def dnsPostLDA(inputPath: String, resultsFilePath: String, threshold: Double, topK: Int, documentResults: Array[String],
                  wordResults: Array[String], sc: SparkContext, sqlContext: SQLContext, logger: Logger) = {
 
     logger.info("DNS post LDA starts")
@@ -142,7 +143,19 @@ object DNSPostLDA {
     addcol("score")
 
     logger.info("Persisting data")
-    val scored = src_scored.filter(elem => elem._1 < threshold).sortByKey().map(row => row._2.mkString(","))
+
+
+    val filteredSorted = src_scored.filter(elem => elem._1 < threshold).sortByKey()
+
+    val count = filteredSorted.count
+
+    val takeCount  = if (topK == -1 || count < topK) {
+      count.toInt
+    } else {
+      topK
+    }
+    val scored : RDD[String] =  sc.parallelize(filteredSorted.take(takeCount).map(row => row._2.mkString("\t")))
+
     scored.saveAsTextFile(resultsFilePath)
 
     logger.info("DNS Post LDA completed")
