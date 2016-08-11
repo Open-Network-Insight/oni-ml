@@ -5,8 +5,7 @@ import org.apache.spark.SparkContext
 import org.apache.spark.broadcast.Broadcast
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.{DataFrame, Row, SQLContext}
-import org.opennetworkinsight.utilities.{Entropy, Quantiles, TopDomains}
-import org.opennetworkinsight.utilities.{Entropy, Quantiles}
+import org.opennetworkinsight.utilities._
 import org.slf4j.Logger
 
 /**
@@ -73,7 +72,7 @@ object ProxyPostLDA {
   def score(sc: SparkContext, dataFrame: DataFrame, topicCount: Int, ipToTopicMIx: Map[String, Array[Double]],
             wordToPerTopicProb: Map[String, Array[Double]]) : DataFrame = {
 
-    val topDomains: Broadcast[Set[String]] = sc.broadcast(TopDomains.topDomains)
+    val topDomains: Broadcast[Set[String]] = sc.broadcast(TopDomains.TOP_DOMAINS)
 
     def getTimeAsDouble(timeStr: String) = {
       val s = timeStr.split(":")
