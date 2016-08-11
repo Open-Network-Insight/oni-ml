@@ -145,18 +145,26 @@ object DNSPostLDA {
     logger.info("Persisting data")
 
 
-    val filteredSorted = src_scored.filter(elem => elem._1 < threshold).sortByKey()
+    val filtered = src_scored.filter(elem => elem._1 < threshold)
 
-    val count = filteredSorted.count
+    val count = filtered.count
 
     val takeCount  = if (topK == -1 || count < topK) {
       count.toInt
     } else {
       topK
     }
-    val scored : RDD[String] =  sc.parallelize(filteredSorted.take(takeCount).map(row => row._2.mkString("\t")))
+    class OrderByLeastScoreToTop() extends Ordering[(Double,Array[Any])] {
+      def compare(p1: (Double, Array[Any]), p2: (Double, Array[Any]))    = p2._1.compare(p1._1)
+    }
 
-    scored.saveAsTextFile(resultsFilePath)
+    implicit val ordering = new OrderByLeastScoreToTop()
+
+    val top : Array[(Double,Array[Any])] = filtered.top(takeCount)
+
+    val outputRDD = sc.parallelize(top).sortBy(_._1).map(_._2.mkString("\t"))
+
+    outputRDD.saveAsTextFile(resultsFilePath)
 
     logger.info("DNS Post LDA completed")
   }

@@ -3,6 +3,7 @@ package org.opennetworkinsight.proxy
 import org.apache.log4j.{Logger => ApacheLogger}
 import org.apache.spark.SparkContext
 import org.apache.spark.broadcast.Broadcast
+import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.{DataFrame, Row, SQLContext}
 import org.opennetworkinsight.utilities._
@@ -55,9 +56,7 @@ object ProxyPostLDA {
 
     val filteredDF = scoredDF.filter("score < " + threshold)
 
-    val sortedDF = filteredDF.sort("score")
-
-    val count = sortedDF.count
+    val count = filteredDF.count
 
     val takeCount  = if (topK == -1 || count < topK) {
       count.toInt
@@ -65,12 +64,23 @@ object ProxyPostLDA {
       topK
     }
 
-    val outRDD = sc.parallelize(sortedDF.take(takeCount))
+    val scoreIndex = filteredDF.schema.fieldNames.indexOf("score")
+
+    class RowOrderByLeastScoreToTop() extends Ordering[Row] {
+      def compare(row1: Row, row2: Row) = row2.getDouble(scoreIndex).compare(row1.getDouble(scoreIndex))
+    }
+
+    implicit val rowOrdering = new RowOrderByLeastScoreToTop()
+    val topRows : Array[Row] = filteredDF.rdd.top(takeCount)
+
+    val sortedRows = topRows.sortBy(row => row.getDouble(scoreIndex))
+
+
+    val outRDD = sc.parallelize(sortedRows)
     outRDD.map(_.mkString("\t")).saveAsTextFile(resultsFilePath)
 
+
     logger.info("Persisting data")
-
-
     logger.info("proxy post LDA completed")
   }
 
