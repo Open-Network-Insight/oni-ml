@@ -126,17 +126,26 @@ The Hive tables containing DNS data for oni-ml analyses have the following schem
 
 To run a suspicious connects analysis, execute the  `ml_ops.sh` script in the ml directory of the MLNODE.
 ```
-./ml_ops.sh YYYMMDD <type> <suspicion threshold>
+./ml_ops.sh YYYMMDD <type> <suspicion threshold> <max results returned>
 ```
+
 
 For example:  
 ```
-./ml_ops.sh 19731231 flow 1e-20
+./ml_ops.sh 19731231 flow 1e-20 200
 ```
-and
+
+If the max results returned argument is not provided, all results with scores below the threshold will be returned, for example:
 ```
 ./ml_ops.sh 20150101 dns 1e-4
 ```
+
+As the maximum probability of an event is 1, a threshold of 1 can be used to select a fixed number of most suspicious items regardless of their exact scores:
+```
+./ml_ops.sh 20150101 proxy 1 2000
+```
+
+
 ### oni-ml output
 
 Final results are stored in the following file on HDFS:
