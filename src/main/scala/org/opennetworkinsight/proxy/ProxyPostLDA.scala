@@ -73,10 +73,7 @@ object ProxyPostLDA {
     implicit val rowOrdering = new RowOrderByLeastScoreToTop()
     val topRows : Array[Row] = filteredDF.rdd.top(takeCount)
 
-    val sortedRows = topRows.sortBy(row => row.getDouble(scoreIndex))
-
-
-    val outRDD = sc.parallelize(sortedRows)
+    val outRDD = sc.parallelize(topRows).sortBy(row => row.getDouble(scoreIndex))
     outRDD.map(_.mkString("\t")).saveAsTextFile(resultsFilePath)
 
 
