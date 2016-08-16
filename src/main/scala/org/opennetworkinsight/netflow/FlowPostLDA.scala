@@ -6,7 +6,7 @@ import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.SQLContext
 import org.opennetworkinsight.utilities.Quantiles
-import org.opennetworkinsight.netflow.{FlowColumnIndex => indexOf}
+import org.opennetworkinsight.netflow.{FlowColumnIndex => indexOf, FlowSchema => Schema}
 import org.slf4j.Logger
 
 /**
@@ -46,36 +46,36 @@ object FlowPostLDA {
     logger.info("loading data")
     val rawdata: RDD[String] = {
       val flowDataFrame = sqlContext.parquetFile(inputPath)
-        .filter("trhour BETWEEN 0 AND 23 AND  " +
-          "trminute BETWEEN 0 AND 59 AND  " +
-          "trsec BETWEEN 0 AND 59")
-        .select("treceived",
-          "tryear",
-          "trmonth",
-          "trday",
-          "trhour",
-          "trminute",
-          "trsec",
-          "tdur",
-          "sip",
-          "dip",
-          "sport",
-          "dport",
-          "proto",
-          "flag",
-          "fwd",
-          "stos",
-          "ipkt",
-          "ibyt",
-          "opkt",
-          "obyt",
-          "input",
-          "output",
-          "sas",
-          "das",
-          "dtos",
-          "dir",
-          "rip")
+        .filter(Schema.Hour + " BETWEEN 0 AND 23 AND  " +
+          Schema.Minute + " BETWEEN 0 AND 59 AND  " +
+          Schema.Second + " BETWEEN 0 AND 59")
+        .select(Schema.TimeReceived,
+          Schema.Year,
+          Schema.Month,
+          Schema.Day,
+          Schema.Hour,
+          Schema.Minute,
+          Schema.Second,
+          Schema.Duration,
+          Schema.SourceIP,
+          Schema.DestinationIP,
+          Schema.SourcePort,
+          Schema.DestinationPort,
+          Schema.proto,
+          Schema.Flag,
+          Schema.fwd,
+          Schema.stos,
+          Schema.ipkt,
+          Schema.ibyt,
+          Schema.opkt,
+          Schema.obyt,
+          Schema.input,
+          Schema.output,
+          Schema.sas,
+          Schema.das,
+          Schema.dtos,
+          Schema.dir,
+          Schema.rip)
       flowDataFrame.map(_.mkString(","))
     }
 
