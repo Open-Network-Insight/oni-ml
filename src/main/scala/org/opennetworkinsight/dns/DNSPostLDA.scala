@@ -5,7 +5,7 @@ import org.apache.spark.SparkContext
 import org.apache.spark.sql.SQLContext
 import org.opennetworkinsight.utilities.{Entropy, Quantiles}
 import org.slf4j.Logger
-
+import org.opennetworkinsight.dns.{DNSSchema => Schema}
 import scala.io.Source
 
 /**
@@ -60,11 +60,13 @@ object DNSPostLDA {
           df = df.unionAll(sqlContext.parquetFile(file).filter("frame_len is not null and unix_tstamp is not null"))
         }
       }
-      df = df.select("frame_time", "unix_tstamp", "frame_len", "ip_dst", "dns_qry_name", "dns_qry_class", "dns_qry_type", "dns_qry_rcode")
+      df = df.select(Schema.Timestamp, Schema.UnixTimestamp, Schema.FrameLength, Schema.ClientIP, Schema.QueryName,
+        Schema.QueryClass, Schema.QueryType, Schema.QueryResponseCode)
       df_cols = df.columns
       val tempRDD: org.apache.spark.rdd.RDD[String] = df.map(_.mkString(","))
       tempRDD
     }
+    
     val rawdata: org.apache.spark.rdd.RDD[String] = {
       multidata
     }
@@ -81,17 +83,17 @@ object DNSPostLDA {
 
     logger.info("Computing subdomain info")
 
-    var data_with_subdomains = datagood.map(row => row ++ DNSWordCreation.extractSubdomain(country_codes, row(col("dns_qry_name"))))
-    addcol("domain")
-    addcol("subdomain")
-    addcol("subdomain.length")
-    addcol("num.periods")
+    var data_with_subdomains = datagood.map(row => row ++ DNSWordCreation.extractSubdomain(country_codes, row(col(Schema.QueryName))))
+    addcol(Schema.Domain)
+    addcol(Schema.Subdomain)
+    addcol(Schema.SubdomainLength)
+    addcol(Schema.NumPeriods)
 
-    data_with_subdomains = data_with_subdomains.map(data => data :+ Entropy.stringEntropy(data(col("subdomain"))).toString)
+    data_with_subdomains = data_with_subdomains.map(data => data :+ Entropy.stringEntropy(data(col(Schema.Subdomain))).toString)
     addcol("subdomain.entropy")
 
     logger.info("calculating time cuts ...")
-    time_cuts = Quantiles.computeDeciles(data_with_subdomains.map(r => r(col("unix_tstamp")).toDouble))
+    time_cuts = Quantiles.computeDeciles(data_with_subdomains.map(r => r(col(Schema.UnixTimestamp)).toDouble))
     logger.info(time_cuts.mkString(","))
 
     logger.info("calculating frame length cuts ...")
@@ -119,7 +121,7 @@ object DNSPostLDA {
     logger.info("adding words")
     data = data.map(row => {
       val word = row(col("top_domain")) + "_" + DNSWordCreation.binColumn(row(col("frame_len")), frame_length_cuts) + "_" +
-        DNSWordCreation.binColumn(row(col("unix_tstamp")), time_cuts) + "_" +
+        DNSWordCreation.binColumn(row(col(Schema.UnixTimestamp)), time_cuts) + "_" +
         DNSWordCreation.binColumn(row(col("subdomain.length")), subdomain_length_cuts) + "_" +
         DNSWordCreation.binColumn(row(col("subdomain.entropy")), entropy_cuts) + "_" +
         DNSWordCreation.binColumn(row(col("num.periods")), numperiods_cuts) + "_" + row(col("dns_qry_type")) + "_" + row(col("dns_qry_rcode"))
