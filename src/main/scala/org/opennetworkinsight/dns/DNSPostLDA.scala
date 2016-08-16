@@ -154,15 +154,15 @@ object DNSPostLDA {
     } else {
       topK
     }
-    class OrderByLeastScoreToTop() extends Ordering[(Double,Array[Any])] {
-      def compare(p1: (Double, Array[Any]), p2: (Double, Array[Any]))    = p2._1.compare(p1._1)
+    class DataOrdering() extends Ordering[(Double,Array[Any])] {
+      def compare(p1: (Double, Array[Any]), p2: (Double, Array[Any]))    = p1._1.compare(p2._1)
     }
 
-    implicit val ordering = new OrderByLeastScoreToTop()
+    implicit val ordering = new DataOrdering()
 
-    val top : Array[(Double,Array[Any])] = filtered.top(takeCount)
+    val top : Array[(Double,Array[Any])] = filtered.takeOrdered(takeCount)
 
-    val outputRDD = sc.parallelize(top).sortBy(_._1).map(_._2.mkString("\t"))
+    val outputRDD = sc.parallelize(top).sortBy(_._1).map(_._2.mkString(","))
 
     outputRDD.saveAsTextFile(resultsFilePath)
 

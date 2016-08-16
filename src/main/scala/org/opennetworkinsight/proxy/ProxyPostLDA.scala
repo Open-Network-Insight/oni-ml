@@ -66,15 +66,15 @@ object ProxyPostLDA {
 
     val scoreIndex = filteredDF.schema.fieldNames.indexOf("score")
 
-    class RowOrderByLeastScoreToTop() extends Ordering[Row] {
-      def compare(row1: Row, row2: Row) = row2.getDouble(scoreIndex).compare(row1.getDouble(scoreIndex))
+    class DataOrdering() extends Ordering[Row] {
+      def compare(row1: Row, row2: Row) = row1.getDouble(scoreIndex).compare(row2.getDouble(scoreIndex))
     }
 
-    implicit val rowOrdering = new RowOrderByLeastScoreToTop()
-    val topRows : Array[Row] = filteredDF.rdd.top(takeCount)
+    implicit val rowOrdering = new DataOrdering()
+    val topRows : Array[Row] = filteredDF.rdd.takeOrdered(takeCount)
 
-    val outRDD = sc.parallelize(topRows).sortBy(row => row.getDouble(scoreIndex))
-    outRDD.map(_.mkString("\t")).saveAsTextFile(resultsFilePath)
+    val outputRDD = sc.parallelize(topRows).sortBy(row => row.getDouble(scoreIndex))
+    outputRDD.map(_.mkString(",")).saveAsTextFile(resultsFilePath)
 
 
     logger.info("Persisting data")
