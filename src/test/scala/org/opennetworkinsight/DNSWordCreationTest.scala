@@ -8,7 +8,7 @@ import org.scalatest.Matchers
 
 class DNSWordCreationTest extends TestingSparkContextFlatSpec with Matchers{
 
-  val countryCodesSet = DNSWordCreation.l_country_codes
+  val countryCodesSet = DNSWordCreation.countryCodes
 
   "extractSubdomain" should "return domain=None, subdomain= None, subdomain length= 0 and number of parts = 6" in {
 

@@ -1,10 +1,12 @@
 package org.opennetworkinsight.dns
 
 import org.apache.spark.broadcast.Broadcast
+import org.apache.spark.sql.functions._
+import org.opennetworkinsight.utilities.{Entropy, Quantiles}
 
   object DNSWordCreation {
 
-    val l_country_codes = Set("ac", "ad", "ae", "af", "ag", "ai", "al", "am", "an", "ao", "aq", "ar", "as", "at", "au",
+    val countryCodes = Set("ac", "ad", "ae", "af", "ag", "ai", "al", "am", "an", "ao", "aq", "ar", "as", "at", "au",
       "aw", "ax", "az", "ba", "bb", "bd", "be", "bf", "bg", "bh", "bi", "bj", "bm", "bn", "bo", "bq", "br", "bs", "bt",
       "bv", "bw", "by", "bz", "ca", "cc", "cd", "cf", "cg", "ch", "ci", "ck", "cl", "cm", "cn", "co", "cr", "cu", "cv",
       "cw", "cx", "cy", "cz", "de", "dj", "dk", "dm", "do", "dz", "ec", "ee", "eg", "eh", "er", "es", "et", "eu", "fi",
@@ -26,7 +28,18 @@ import org.apache.spark.broadcast.Broadcast
       columns
     }
 
-    def extractSubdomain(country_codes: Broadcast[Set[String]], url: String): Array[String] = {
+    def udfGetTopDomain(topDomains: Broadcast[Set[String]]) = udf((domain: String) => getTopDomain(topDomains, domain))
+
+    def getTopDomain(topDomains: Broadcast[Set[String]], domain: String) = {
+      if (domain == "intel") {
+        "2"
+      } else if (topDomains.value contains domain) {
+        "1"
+      } else "0"
+    }
+
+    def extractSubdomain(country_codes: Broadcast[Set[String]], url: String): Array[Any] = {
+
       var spliturl = url.split("[.]")
       var numparts = spliturl.length
       var domain = "None"
@@ -60,11 +73,11 @@ import org.apache.spark.broadcast.Broadcast
       }
       Array(domain, subdomain, {
         if (subdomain != "None") {
-          subdomain.length.toString
+          subdomain.length.toDouble
         } else {
-          "0"
+          0
         }
-      }, numparts.toString)
+      }, numparts.toDouble)
     }
 
     def binColumn(value: String, cuts: Array[Double]) = {
@@ -75,6 +88,47 @@ import org.apache.spark.broadcast.Broadcast
         }
       }
       bin.toString
+    }
+
+    def udfStringEntropy() = udf((subdomain: String) => Entropy.stringEntropy(subdomain))
+
+    def udfWordCreation(frameLengthCuts: Array[Double],
+                        timeCuts: Array[Double],
+                        subdomainLengthCuts: Array[Double],
+                        entropyCuts: Array[Double],
+                        numberPeriodsCuts: Array[Double]) =
+      udf((topDomain: String,
+           frameLength: String,
+           unixTimeStamp: String,
+           subdomainLength: Double,
+           subdomainEntropy: Double,
+           numberPeriods: Double,
+           dnsQueryType: String,
+           dnsQueryRcode: String) => dnsWord(topDomain, frameLength, unixTimeStamp, subdomainLength, subdomainEntropy,
+        numberPeriods, dnsQueryType, dnsQueryRcode, frameLengthCuts, timeCuts, subdomainLengthCuts, entropyCuts, numberPeriodsCuts))
+
+    def dnsWord(topDomain: String,
+                frameLength: String,
+                unixTimeStamp: String,
+                subdomainLength: Double,
+                subdomainEntropy: Double,
+                numberPeriods: Double,
+                dnsQueryType: String,
+                dnsQueryRcode: String,
+                frameLengthCuts: Array[Double],
+                timeCuts: Array[Double],
+                subdomainLengthCuts: Array[Double],
+                entropyCuts: Array[Double],
+                numberPeriodsCuts: Array[Double]) = {
+
+      val word = Seq(topDomain ,
+        Quantiles.bin(frameLength.toDouble, frameLengthCuts) ,
+        Quantiles.bin(unixTimeStamp.toDouble, timeCuts) ,
+        Quantiles.bin(subdomainLength, subdomainLengthCuts) ,
+        Quantiles.bin(subdomainEntropy, entropyCuts) ,
+        Quantiles.bin(numberPeriods, numberPeriodsCuts) ,
+        dnsQueryType ,
+        dnsQueryRcode).mkString("_")
     }
 
   }

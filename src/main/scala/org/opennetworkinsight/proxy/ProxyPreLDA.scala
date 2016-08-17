@@ -1,6 +1,5 @@
 package org.opennetworkinsight.proxy
 
-import org.apache.log4j.{Logger => apacheLogger}
 import org.apache.spark.SparkContext
 import org.apache.spark.broadcast.Broadcast
 import org.apache.spark.rdd.RDD
