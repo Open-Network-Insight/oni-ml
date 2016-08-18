@@ -8,7 +8,7 @@ import org.apache.spark.sql.functions._
 import org.apache.spark.sql.{DataFrame, Row, SQLContext}
 import org.opennetworkinsight.utilities._
 import org.slf4j.Logger
-import  org.opennetworkinsight.proxy.{ProxySchema => Schema}
+
 /**
   *
   */
@@ -30,26 +30,26 @@ object ProxyPostLDA {
 
 
     val rawDataDF = sqlContext.parquetFile(inputPath)
-      .filter(Schema.Date +  " is not null and " + Schema.Time + " is not null and " + Schema.ClientIP + " is not null")
-      .select(Schema.Date,
-        Schema.Time,
-        Schema.ClientIP,
-        Schema.Host,
-        Schema.ReqMethod,
-        Schema.UserAgent,
-        Schema.ResponseContentType,
-        Schema.Duration,
-        Schema.UserName,
-        Schema.WebCat,
-        Schema.Referer,
-        Schema.RespCode,
-        Schema.URIPort,
-        Schema.URIPath,
-        Schema.URIQuery,
-        Schema.ServerIP,
-        Schema.SCBytes,
-        Schema.CSBytes,
-        Schema.FullURI)
+      .filter("proxy_date is not null and proxy_time is not null and proxy_clientip is not null")
+      .select("proxy_date",
+        "proxy_time",
+        "proxy_clientip",
+        "proxy_host",
+        "proxy_reqmethod",
+        "proxy_useragent",
+        "proxy_resconttype",
+        "proxy_duration",
+        "proxy_username",
+        "proxy_webcat",
+        "proxy_referer",
+        "proxy_respcode",
+        "proxy_uriport",
+        "proxy_uripath",
+        "proxy_uriquery",
+        "proxy_serverip",
+        "proxy_scbytes",
+        "proxy_csbytes",
+        "proxy_fulluri")
 
     logger.info("Computing conditional probability")
     val scoredDF : DataFrame = score(sc, rawDataDF, topicCount, ipToTopicMix, wordsToProbPerTopic)
@@ -104,23 +104,22 @@ object ProxyPostLDA {
     }
 
     val timeCuts =
-      Quantiles.computeDeciles(dataFrame.select(Schema.Time).rdd.map(r => getTimeAsDouble(r(0).toString())))
+      Quantiles.computeDeciles(dataFrame.select("proxy_time").rdd.map(r => getTimeAsDouble(r(0).toString())))
 
-    val entropyCuts = Quantiles.computeQuintiles(dataFrame.select(Schema.FullURI).
+    val entropyCuts = Quantiles.computeQuintiles(dataFrame.select("proxy_fulluri").
       rdd.map({case Row(uri: String) => Entropy.stringEntropy(uri)}))
 
     val agentToCount: Map[String, Long] =
-      dataFrame.select(Schema.UserAgent).rdd.map({case Row(ua: String) => (ua,1L)}).reduceByKey(_+_).collect().toMap
+      dataFrame.select("proxy_useragent").rdd.map({case Row(ua: String) => (ua,1L)}).reduceByKey(_+_).collect().toMap
 
     val agentToCountBC = sc.broadcast(agentToCount)
 
-    val agentCuts = Quantiles.computeQuintiles(dataFrame.select(Schema.UserAgent).rdd.map({case Row(ua: String) => agentToCountBC.value(ua)}))
+    val agentCuts = Quantiles.computeQuintiles(dataFrame.select("proxy_useragent").rdd.map({case Row(ua: String) => agentToCountBC.value(ua)}))
 
     val udfWordCreation = ProxyWordCreation.udfWordCreation(topDomains, agentToCountBC, timeCuts, entropyCuts, agentCuts)
 
-    val wordedDataFrame = dataFrame.withColumn(Schema.Word,  udfWordCreation(dataFrame(Schema.Host), dataFrame(Schema.Time),
-      dataFrame(Schema.ReqMethod), dataFrame(Schema.FullURI), dataFrame(Schema.ResponseContentType),
-      dataFrame(Schema.UserAgent), dataFrame(Schema.RespCode)))
+    val wordedDataFrame = dataFrame.withColumn("word",  udfWordCreation(dataFrame("proxy_host"), dataFrame("proxy_time"),
+      dataFrame("proxy_reqmethod"), dataFrame("proxy_fulluri"), dataFrame("proxy_resconttype"), dataFrame("proxy_useragent"), dataFrame("proxy_respcode")))
 
     val ipToTopicMixBC = sc.broadcast(ipToTopicMIx)
     val wordToPerTopicProbBC  = sc.broadcast(wordToPerTopicProb)
@@ -138,6 +137,6 @@ object ProxyPostLDA {
     }
 
     def udfScoreFunction = udf((ip: String, word: String) => scoreFunction(ip,word))
-    wordedDataFrame.withColumn(Schema.Score, udfScoreFunction(wordedDataFrame(Schema.ClientIP), wordedDataFrame(Schema.Word)))
+    wordedDataFrame.withColumn("score", udfScoreFunction(wordedDataFrame("proxy_clientip"), wordedDataFrame("word")))
   }
 }
