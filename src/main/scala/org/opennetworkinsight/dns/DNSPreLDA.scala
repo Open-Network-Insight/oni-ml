@@ -6,7 +6,7 @@ import org.apache.spark.sql.SQLContext
 import org.opennetworkinsight.OniLDACWrapper.OniLDACInput
 import org.opennetworkinsight.utilities.{Entropy, Quantiles}
 import org.slf4j.Logger
-
+import org.opennetworkinsight.dns.{DNSSchema => Schema}
 import scala.io.Source
 
 /**
@@ -119,8 +119,8 @@ object DNSPreLDA {
           df = df.unionAll(sqlContext.parquetFile(file).filter("frame_len is not null and unix_tstamp is not null"))
         }
       }
-      df = df.select("frame_time", "unix_tstamp", "frame_len", "ip_dst", "dns_qry_name",
-        "dns_qry_class", "dns_qry_type", "dns_qry_rcode")
+      df = df.select(Schema.Timestamp, Schema.UnixTimestamp, Schema.FrameLength, Schema.ClientIP, Schema.QueryName,
+        Schema.QueryClass, Schema.QueryType, Schema.QueryResponseCode)
       df_cols = df.columns
       val tempRDD: org.apache.spark.rdd.RDD[String] = df.map(_.mkString(","))
       tempRDD
@@ -141,7 +141,7 @@ object DNSPreLDA {
       col(colname) = col.values.max + 1
     }
     if (feedbackFile != "None") {
-      addcol("feedback")
+      addcol(Schema.Feedback)
     }
 
     val datagood = rawdata.map(line => line.split(",")).filter(line => (line.length == df_cols.length)).map(line => {
@@ -157,50 +157,50 @@ object DNSPreLDA {
     logger.info("Computing subdomain info")
 
     var data_with_subdomains = datagood.map(row => row ++ DNSWordCreation.extractSubdomain(country_codes, row(col("dns_qry_name"))))
-    addcol("domain")
-    addcol("subdomain")
-    addcol("subdomain.length")
-    addcol("num.periods")
+    addcol(Schema.Domain)
+    addcol(Schema.Subdomain)
+    addcol(Schema.SubdomainLength)
+    addcol(Schema.NumPeriods)
 
-    data_with_subdomains = data_with_subdomains.map(data => data :+ Entropy.stringEntropy(data(col("subdomain"))).toString)
-    addcol("subdomain.entropy")
+    data_with_subdomains = data_with_subdomains.map(data => data :+ Entropy.stringEntropy(data(col(Schema.Subdomain))).toString)
+    addcol(Schema.SubdomainEntropy)
 
     logger.info("Calculating time cuts ...")
-    time_cuts = Quantiles.computeDeciles(data_with_subdomains.map(r => r(col("unix_tstamp")).toDouble))
+    time_cuts = Quantiles.computeDeciles(data_with_subdomains.map(r => r(col(Schema.UnixTimestamp)).toDouble))
     logger.info(time_cuts.mkString(","))
 
     logger.info("Calculating frame length cuts ...")
-    frame_length_cuts = Quantiles.computeDeciles(data_with_subdomains.map(r => r(col("frame_len")).toDouble))
+    frame_length_cuts = Quantiles.computeDeciles(data_with_subdomains.map(r => r(col(Schema.FrameLength)).toDouble))
     logger.info(frame_length_cuts.mkString(","))
     logger.info("Calculating subdomain length cuts ...")
-    subdomain_length_cuts = Quantiles.computeQuintiles(data_with_subdomains.filter(r => r(col("subdomain.length")).toDouble > 0).map(r => r(col("subdomain.length")).toDouble))
+    subdomain_length_cuts = Quantiles.computeQuintiles(data_with_subdomains.filter(r => r(col(Schema.SubdomainLength)).toDouble > 0).map(r => r(col(Schema.SubdomainLength)).toDouble))
     logger.info(subdomain_length_cuts.mkString(","))
     logger.info("Calculating entropy cuts")
-    entropy_cuts = Quantiles.computeQuintiles(data_with_subdomains.filter(r => r(col("subdomain.entropy")).toDouble > 0).map(r => r(col("subdomain.entropy")).toDouble))
+    entropy_cuts = Quantiles.computeQuintiles(data_with_subdomains.filter(r => r(col(Schema.SubdomainEntropy)).toDouble > 0).map(r => r(col(Schema.SubdomainEntropy)).toDouble))
     logger.info(entropy_cuts.mkString(","))
     logger.info("Calculating num periods cuts ...")
-    numperiods_cuts = Quantiles.computeQuintiles(data_with_subdomains.filter(r => r(col("num.periods")).toDouble > 0).map(r => r(col("num.periods")).toDouble))
+    numperiods_cuts = Quantiles.computeQuintiles(data_with_subdomains.filter(r => r(col(Schema.NumPeriods)).toDouble > 0).map(r => r(col(Schema.NumPeriods)).toDouble))
     logger.info(numperiods_cuts.mkString(","))
 
     var data = data_with_subdomains.map(line => line :+ {
-      if (line(col("domain")) == "intel") {
+      if (line(col(Schema.Domain)) == "intel") {
         "2"
-      } else if (top_domains.value contains line(col("domain"))) {
+      } else if (top_domains.value contains line(col(Schema.Domain))) {
         "1"
       } else "0"
     })
-    addcol("top_domain")
+    addcol(Schema.TopDomain)
 
     logger.info("Adding words")
     data = data.map(row => {
-      val word = row(col("top_domain")) + "_" + DNSWordCreation.binColumn(row(col("frame_len")), frame_length_cuts) + "_" +
-        DNSWordCreation.binColumn(row(col("unix_tstamp")), time_cuts) + "_" +
-        DNSWordCreation.binColumn(row(col("subdomain.length")), subdomain_length_cuts) + "_" +
-        DNSWordCreation.binColumn(row(col("subdomain.entropy")), entropy_cuts) + "_" +
-        DNSWordCreation.binColumn(row(col("num.periods")), numperiods_cuts) + "_" + row(col("dns_qry_type")) + "_" + row(col("dns_qry_rcode"))
+      val word = row(col(Schema.TopDomain)) + "_" + DNSWordCreation.binColumn(row(col(Schema.FrameLength)), frame_length_cuts) + "_" +
+        DNSWordCreation.binColumn(row(col(Schema.UnixTimestamp)), time_cuts) + "_" +
+        DNSWordCreation.binColumn(row(col(Schema.SubdomainLength)), subdomain_length_cuts) + "_" +
+        DNSWordCreation.binColumn(row(col(Schema.SubdomainEntropy)), entropy_cuts) + "_" +
+        DNSWordCreation.binColumn(row(col(Schema.NumPeriods)), numperiods_cuts) + "_" + row(col(Schema.QueryType)) + "_" + row(col(Schema.QueryResponseCode))
       row :+ word
     })
-    addcol("word")
+    addcol(Schema.Word)
 
     val ipDstWordCounts = data.map(row => ((row(col("ip_dst")), row(col("word"))), 1)).reduceByKey(_ + _)
     ipDstWordCounts.map({case ((ipDst, word), count) => OniLDACInput(ipDst, word, count)})
