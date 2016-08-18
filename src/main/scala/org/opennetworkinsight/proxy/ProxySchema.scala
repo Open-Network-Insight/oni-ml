@@ -11,7 +11,7 @@ object ProxySchema {
   val ReqMethod = "reqmethod"
   val UserAgent = "useragent"
   val ResponseContentType = "resconttype"
-  val Duration = "duration int"
+  val Duration = "duration"
   val UserName = "username"
   val AuthGroup = "authgroup"
   val ExceptionId = "exceptionid"
