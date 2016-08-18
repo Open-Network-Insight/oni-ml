@@ -74,7 +74,7 @@ object ProxyPostLDA {
     val topRows : Array[Row] = filteredDF.rdd.takeOrdered(takeCount)
 
     val outputRDD = sc.parallelize(topRows).sortBy(row => row.getDouble(scoreIndex))
-    outputRDD.map(_.mkString(",")).saveAsTextFile(resultsFilePath)
+    outputRDD.map(_.mkString("\t")).saveAsTextFile(resultsFilePath)
 
 
     logger.info("Persisting data")

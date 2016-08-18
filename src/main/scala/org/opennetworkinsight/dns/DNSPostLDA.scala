@@ -162,7 +162,7 @@ object DNSPostLDA {
 
     val top : Array[(Double,Array[Any])] = filtered.takeOrdered(takeCount)
 
-    val outputRDD = sc.parallelize(top).sortBy(_._1).map(_._2.mkString(","))
+    val outputRDD = sc.parallelize(top).sortBy(_._1).map(_._2.mkString("\t"))
 
     outputRDD.saveAsTextFile(resultsFilePath)
 
