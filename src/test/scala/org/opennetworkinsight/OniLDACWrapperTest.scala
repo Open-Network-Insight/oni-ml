@@ -1,5 +1,6 @@
 package org.opennetworkinsight
 
+import org.opennetworkinsight.OniLDACWrapper.OniLDACInput
 import org.opennetworkinsight.testutils.TestingSparkContextFlatSpec
 import org.scalatest.Matchers
 
@@ -50,17 +51,17 @@ class OniLDACWrapperTest extends TestingSparkContextFlatSpec with Matchers{
   "createModel" should "return model in Array[String] format. Each string should contain the document count and the" +
     "total count for each word" in {
 
-    val documentWordData = sparkContext.parallelize(Array(Array("192.168.1.1", "333333_7.0_0.0_1.0", "8"),
-      Array("10.10.98.123", "1111111_6.0_3.0_5.0", "4"),
-      Array("66.23.45.11", "-1_43_7.0_2.0_6.0", "2"),
-      Array("192.168.1.1", "-1_80_6.0_1.0_1.0", "5")))
+    val documentWordData = sparkContext.parallelize(Array(OniLDACInput("192.168.1.1", "333333_7.0_0.0_1.0", 8),
+      OniLDACInput("10.10.98.123", "1111111_6.0_3.0_5.0", 4),
+      OniLDACInput("66.23.45.11", "-1_43_7.0_2.0_6.0", 2),
+      OniLDACInput("192.168.1.1", "-1_80_6.0_1.0_1.0", 5)))
 
     val wordDictionary = Map("333333_7.0_0.0_1.0" -> 0,
       "1111111_6.0_3.0_5.0" -> 1,
       "-1_43_7.0_2.0_6.0" -> 2,
       "-1_80_6.0_1.0_1.0" -> 3)
 
-    val distinctDocument = documentWordData.map(row => row(0)).distinct.collect
+    val distinctDocument = documentWordData.map({case OniLDACInput(doc, word, count) => doc}).distinct.collect()
 
     val model = OniLDACWrapper.createModel(documentWordData, wordDictionary, distinctDocument)
 

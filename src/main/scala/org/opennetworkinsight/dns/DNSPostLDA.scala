@@ -2,6 +2,7 @@
 package org.opennetworkinsight.dns
 
 import org.apache.spark.SparkContext
+import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.SQLContext
 import org.opennetworkinsight.utilities.{Entropy, Quantiles}
 import org.slf4j.Logger
@@ -13,7 +14,7 @@ import scala.io.Source
   */
 object DNSPostLDA {
 
-  def dnsPostLDA(inputPath: String, resultsFilePath: String, threshold: Double, documentResults: Array[String],
+  def dnsPostLDA(inputPath: String, resultsFilePath: String, threshold: Double, topK: Int, documentResults: Array[String],
                  wordResults: Array[String], sc: SparkContext, sqlContext: SQLContext, logger: Logger) = {
 
     logger.info("DNS post LDA starts")
@@ -144,8 +145,28 @@ object DNSPostLDA {
     addcol(Schema.Score)
 
     logger.info("Persisting data")
-    val scored = src_scored.filter(elem => elem._1 < threshold).sortByKey().map(row => row._2.mkString(","))
-    scored.saveAsTextFile(resultsFilePath)
+
+
+    val filtered = src_scored.filter(elem => elem._1 < threshold)
+
+    val count = filtered.count
+
+    val takeCount  = if (topK == -1 || count < topK) {
+      count.toInt
+    } else {
+      topK
+    }
+    class DataOrdering() extends Ordering[(Double,Array[Any])] {
+      def compare(p1: (Double, Array[Any]), p2: (Double, Array[Any]))    = p1._1.compare(p2._1)
+    }
+
+    implicit val ordering = new DataOrdering()
+
+    val top : Array[(Double,Array[Any])] = filtered.takeOrdered(takeCount)
+
+    val outputRDD = sc.parallelize(top).sortBy(_._1).map(_._2.mkString(","))
+
+    outputRDD.saveAsTextFile(resultsFilePath)
 
     logger.info("DNS Post LDA completed")
   }

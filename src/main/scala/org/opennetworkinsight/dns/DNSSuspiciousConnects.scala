@@ -17,9 +17,9 @@ object DNSSuspiciousConnects {
 
     val (documentResults, wordResults) = OniLDACWrapper.runLDA(docWordCount, config.modelFile, config.topicDocumentFile, config.topicWordFile,
       config.mpiPreparationCmd, config.mpiCmd, config.mpiProcessCount, config.mpiTopicCount, config.localPath,
-      config.ldaPath, config.localUser, config.dataSource, config.nodes)
+      config.ldaPath, config.localUser, config.analysis, config.nodes)
 
-    DNSPostLDA.dnsPostLDA(config.inputPath, config.hdfsScoredConnect, config.threshold, documentResults,
+    DNSPostLDA.dnsPostLDA(config.inputPath, config.hdfsScoredConnect, config.threshold, config.maxResults, documentResults,
       wordResults, sparkContext, sqlContext, logger)
 
     logger.info("DNS LDA completed")

@@ -3,6 +3,7 @@ package org.opennetworkinsight.proxy
 import org.apache.log4j.{Logger => ApacheLogger}
 import org.apache.spark.SparkContext
 import org.apache.spark.broadcast.Broadcast
+import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.{DataFrame, Row, SQLContext}
 import org.opennetworkinsight.utilities._
@@ -13,7 +14,7 @@ import  org.opennetworkinsight.proxy.{ProxySchema => Schema}
   */
 object ProxyPostLDA {
 
-  def getResults(inputPath: String, resultsFilePath: String, topicCount: Int, threshold: Double,
+  def getResults(inputPath: String, resultsFilePath: String, topicCount: Int, threshold: Double, topK: Int,
                  documentResults: Array[String],  wordResults: Array[String],
                  sc: SparkContext, sqlContext: SQLContext, logger: Logger) = {
 
@@ -54,10 +55,29 @@ object ProxyPostLDA {
     val scoredDF : DataFrame = score(sc, rawDataDF, topicCount, ipToTopicMix, wordsToProbPerTopic)
 
     val filteredDF = scoredDF.filter("score < " + threshold)
+
+    val count = filteredDF.count
+
+    val takeCount  = if (topK == -1 || count < topK) {
+      count.toInt
+    } else {
+      topK
+    }
+
+    val scoreIndex = filteredDF.schema.fieldNames.indexOf("score")
+
+    class DataOrdering() extends Ordering[Row] {
+      def compare(row1: Row, row2: Row) = row1.getDouble(scoreIndex).compare(row2.getDouble(scoreIndex))
+    }
+
+    implicit val rowOrdering = new DataOrdering()
+    val topRows : Array[Row] = filteredDF.rdd.takeOrdered(takeCount)
+
+    val outputRDD = sc.parallelize(topRows).sortBy(row => row.getDouble(scoreIndex))
+    outputRDD.map(_.mkString(",")).saveAsTextFile(resultsFilePath)
+
+
     logger.info("Persisting data")
-
-    val scored = filteredDF.sort("score").rdd.map(_.mkString(",")).saveAsTextFile(resultsFilePath)
-
     logger.info("proxy post LDA completed")
   }
 

@@ -5,6 +5,7 @@ import org.apache.log4j.{Logger => apacheLogger}
 import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.SQLContext
+import org.opennetworkinsight.OniLDACWrapper.OniLDACInput
 import org.opennetworkinsight.utilities.Quantiles
 import org.opennetworkinsight.netflow.{FlowColumnIndex => indexOf, FlowSchema => Schema}
 import org.slf4j.Logger
@@ -18,7 +19,7 @@ import scala.io.Source
 object FlowPreLDA {
 
   def flowPreLDA(inputPath: String, scoresFile: String, duplicationFactor: Int,
-                 sc: SparkContext, sqlContext: SQLContext, logger: Logger ): RDD[String] = {
+                 sc: SparkContext, sqlContext: SQLContext, logger: Logger ): RDD[OniLDACInput] = {
 
     logger.info("Flow pre LDA starts")
 
@@ -200,18 +201,11 @@ object FlowPreLDA {
 
     val data_with_words = binned_data.map(row => FlowWordCreation.adjustPort(row))
 
-    //next groupby src to get src word counts
-    val src_word_counts = data_with_words.map(row => (row(indexOf.SOURCEIP) + " " + row(indexOf.SOURCEWORD), 1)).reduceByKey(_ + _)
+    val src_word_counts = data_with_words.map(row => ((row(indexOf.SOURCEIP),  row(indexOf.SOURCEWORD)), 1)).reduceByKey(_ + _)
+    val dest_word_counts = data_with_words.map(row => ((row(indexOf.DESTIP),  row(indexOf.DESTWORD)), 1)).reduceByKey(_ + _)
 
+    val word_counts = sc.union(src_word_counts, dest_word_counts).map({case ((ip, word), count) => OniLDACInput(ip, word, count)})
 
-    //groupby dest to get dest word counts
-    val dest_word_counts = data_with_words.map(row => (row(indexOf.DESTIP) + " " + row(indexOf.DESTWORD), 1)).reduceByKey(_ + _)
-
-    //val word_counts = sc.union(src_word_counts, dest_word_counts).map(row => Array(row._1.split(" ")(0).toString, row._1.split(" ")(1).toString, row._2).toString)
-    val word_counts = sc.union(src_word_counts, dest_word_counts).map(row => (row._1.split(" ")(0) + "," + row._1.split(" ")(1).toString + "," + row._2).mkString)
-
-    //logger.info("Persisting data")
-    //sc.stop()
     logger.info("Flow pre LDA completed")
     word_counts
 
