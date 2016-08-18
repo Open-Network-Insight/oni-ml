@@ -3,6 +3,7 @@ package org.opennetworkinsight.dns
 import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.SQLContext
+import org.opennetworkinsight.OniLDACWrapper.OniLDACInput
 import org.opennetworkinsight.utilities.{Entropy, Quantiles}
 import org.slf4j.Logger
 
@@ -24,7 +25,7 @@ object DNSPreLDA {
                       dnsSev: Int) extends Serializable
 
   def dnsPreLDA(inputPath: String, scoresFile: String, duplicationFactor: Int,
-                sc: SparkContext, sqlContext: SQLContext, logger: Logger): RDD[String]
+                sc: SparkContext, sqlContext: SQLContext, logger: Logger): RDD[OniLDACInput]
   = {
 
     logger.info("DNS pre LDA starts")
@@ -201,10 +202,8 @@ object DNSPreLDA {
     })
     addcol("word")
 
-    val wc = data.map(row => (row(col("ip_dst")) + " " + row(col("word")), 1)).reduceByKey(_ + _).map(row => (row._1.split(" ")(0) + "," + row._1.split(" ")(1).toString + "," + row._2).mkString)
-    logger.info("DNS pre LDA completed")
-
-    wc
+    val ipDstWordCounts = data.map(row => ((row(col("ip_dst")), row(col("word"))), 1)).reduceByKey(_ + _)
+    ipDstWordCounts.map({case ((ipDst, word), count) => OniLDACInput(ipDst, word, count)})
   }
 
 }
