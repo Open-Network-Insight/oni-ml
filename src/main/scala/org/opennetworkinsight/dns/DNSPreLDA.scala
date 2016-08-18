@@ -3,6 +3,8 @@ package org.opennetworkinsight.dns
 import org.apache.spark.SparkContext
 import org.apache.spark.broadcast.Broadcast
 import org.apache.spark.rdd.RDD
+import org.apache.spark.sql.SQLContext
+import org.opennetworkinsight.OniLDACWrapper.OniLDACInput
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.{Row, SQLContext}
 import org.opennetworkinsight.utilities.Quantiles
@@ -26,7 +28,7 @@ object DNSPreLDA {
                       dnsSev: Int) extends Serializable
 
   def dnsPreLDA(inputPath: String, scoresFile: String, duplicationFactor: Int,
-                sc: SparkContext, sqlContext: SQLContext, logger: Logger): RDD[String]
+                sc: SparkContext, sqlContext: SQLContext, logger: Logger): RDD[OniLDACInput]
   = {
 
     logger.info("DNS pre LDA starts")
@@ -49,7 +51,7 @@ object DNSPreLDA {
 
     val scoredFileExists = new java.io.File(feedbackFile).exists
 
-    val scoredData = if (scoredFileExists) {
+    val falsePositives: org.apache.spark.rdd.RDD[String] = if (scoredFileExists) {
 
       /* dns_scores.csv - feedback file structure
 
@@ -232,18 +234,26 @@ object DNSPreLDA {
       dataWithTopDomainDF("dns_qry_type"),
       dataWithTopDomainDF("dns_qry_rcode"))).select("ip_dst, word")
 
-    val docWordCount = dataWithWordDF
+//    val docWordCount = dataWithWordDF
+//      .map({
+//        case Row(destIP: String, word: String) =>
+//          (destIP, word) -> 1
+//      })
+//      .reduceByKey(_ + _)
+//      .map({
+//        case ((destIp, word), count) =>
+//          Seq(destIp, word, count).mkString(",")
+//      })
+//
+//    docWordCount
+
+    val ipDstWordCounts = dataWithWordDF
       .map({
         case Row(destIP: String, word: String) =>
           (destIP, word) -> 1
       })
       .reduceByKey(_ + _)
-      .map({
-        case ((destIp, word), count) =>
-          Seq(destIp, word, count).mkString(",")
-      })
-
-    docWordCount
+    ipDstWordCounts.map({case ((ipDst, word), count) => OniLDACInput(ipDst, word, count)})
   }
 
 }

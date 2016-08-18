@@ -4,6 +4,7 @@ import org.apache.spark.SparkContext
 import org.apache.spark.broadcast.Broadcast
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.{DataFrame, Row, SQLContext}
+import org.opennetworkinsight.OniLDACWrapper.OniLDACInput
 import org.opennetworkinsight.utilities._
 import org.slf4j.Logger
 
@@ -15,7 +16,7 @@ object ProxyPreLDA {
 
 
   def getIPWordCounts(inputPath: String, feedbackFile: String, duplicationFactor: Int,
-                      sc: SparkContext, sqlContext: SQLContext, logger: Logger): RDD[String] = {
+                      sc: SparkContext, sqlContext: SQLContext, logger: Logger): RDD[OniLDACInput] = {
 
     logger.info("Proxy pre LDA starts")
 
@@ -74,7 +75,7 @@ object ProxyPreLDA {
                         agentToCountBC: Broadcast[Map[String, Long]],
                         timeCuts: Array[Double],
                         entropyCuts: Array[Double],
-                        agentCuts: Array[Double]) : RDD[String] = {
+                        agentCuts: Array[Double]) : RDD[OniLDACInput] = {
 
     val udfWordCreation = ProxyWordCreation.udfWordCreation(topDomains, agentToCountBC,  timeCuts, entropyCuts, agentCuts)
 
@@ -88,8 +89,7 @@ object ProxyPreLDA {
         dataFrame("proxy_respcode"))).
       select("proxy_clientip", "word")
 
-
-    ipWordDF.map({case Row(ip, word) => ((ip, word), 1)}).reduceByKey(_ + _).map({ case ((ip, word), count) => List(ip, word, count).mkString(",") })
+    ipWordDF.rdd.map({case Row(ip, word) => ((ip.asInstanceOf[String], word.asInstanceOf[String]), 1)}).reduceByKey(_ + _).map({case ((ip, word), count) => OniLDACInput(ip, word, count) })
   }
 }
 

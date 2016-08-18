@@ -17,24 +17,26 @@ import scala.sys.process._
 
 object OniLDACWrapper {
 
-  def runLDA(docWordCount: RDD[String], modelFile: String, topicDocumentFile: String, topicWordFile: String,
+  case class OniLDACInput(doc: String, word: String, count: Int) extends Serializable
+
+
+  def runLDA(docWordCount: RDD[OniLDACInput], modelFile: String, topicDocumentFile: String, topicWordFile: String,
              mpiPreparationCmd: String, mpiCmd: String, mpiProcessCount: String, mpiTopicCount: String,
              localPath: String, ldaPath: String, localUser: String, dataSource: String, nodes: String):
   (Array[String], Array[String])
   =
   {
-    val documentWordData = docWordCount.map(_.split(","))
     // Create word Map Word,Index for further usage
     val wordDictionary: Map[String, Int] = {
-      val words = documentWordData
+      val words = docWordCount
         .cache
-        .map(row => row(1))
+        .map({case OniLDACInput(doc, word, count) => word})
         .distinct
         .collect
       words.zipWithIndex.toMap
     }
 
-    val distinctDocument = documentWordData.map(row => row(0)).distinct.collect
+    val distinctDocument = docWordCount.map({case OniLDACInput(doc, word, count) => doc}).distinct.collect
     //distinctDocument.cache()
 
     // Create document Map Index, Document for further usage
@@ -48,7 +50,7 @@ object OniLDACWrapper {
     }
 
     // Create model for MPI
-    val model = createModel(documentWordData, wordDictionary, distinctDocument)
+    val model = createModel(docWordCount, wordDictionary, distinctDocument)
 
     // Persis model.dat
     val modelWriter = new PrintWriter(new File(modelFile))
@@ -129,18 +131,18 @@ object OniLDACWrapper {
     }
   }
 
-  def createModel(documentWordData: RDD[Array[String]], wordDictionary: Map[String, Int], distinctDocument: Array[String])
+  def createModel(documentWordData: RDD[OniLDACInput], wordToIndex: Map[String, Int], distinctDocument: Array[String])
   : Array[String]
   = {
     val documentCount = documentWordData
-      .map(row => row(0))
+      .map({case OniLDACInput(doc, word, count) => doc})
       .map(document => (document, 1))
       .reduceByKey(_ + _)
       .collect
       .toMap
 
     val wordIndexdocWordCount = documentWordData
-      .map(row => (row(0), wordDictionary(row(1)) + ":" + row(2)))
+      .map({case OniLDACInput(doc, word, count) => (doc, wordToIndex(word) + ":" + count)})
       .groupByKey()
       .map(x => (x._1, x._2.mkString(" ")))
       .collect
