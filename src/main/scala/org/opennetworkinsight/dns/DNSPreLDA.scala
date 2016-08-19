@@ -1,13 +1,9 @@
 package org.opennetworkinsight.dns
 
 import org.apache.spark.SparkContext
-import org.apache.spark.broadcast.Broadcast
 import org.apache.spark.rdd.RDD
-import org.apache.spark.sql.SQLContext
 import org.opennetworkinsight.OniLDACWrapper.OniLDACInput
-import org.apache.spark.sql.types._
-import org.apache.spark.sql.{Row, SQLContext}
-import org.opennetworkinsight.utilities.Quantiles
+import org.apache.spark.sql.{DataFrame, Row, SQLContext}
 import org.slf4j.Logger
 
 import scala.io.Source
@@ -34,24 +30,11 @@ object DNSPreLDA {
     logger.info("DNS pre LDA starts")
 
     import sqlContext.implicits._
-
     val feedbackFile = scoresFile
-    var timeCuts = new Array[Double](10)
-    var frameLengthCuts = new Array[Double](10)
-    var subdomainLengthCuts = new Array[Double](5)
-    var numberPeriodsCuts = new Array[Double](5)
-    var entropyCuts = new Array[Double](5)
+    val scoredFileExists = new java.io.File(feedbackFile).exists
     var rawDataDFColumns = new Array[String](0)
 
-    val topDomains: Broadcast[Set[String]] = sc.broadcast(Source.fromFile("top-1m.csv").getLines
-      .map(line => {
-        val parts = line.split(",")
-        parts(1).split("[.]")(0)
-      }).toSet)
-
-    val scoredFileExists = new java.io.File(feedbackFile).exists
-
-    val falsePositives: org.apache.spark.rdd.RDD[String] = if (scoredFileExists) {
+    val falsePositives: DataFrame = if (scoredFileExists) {
 
       /* dns_scores.csv - feedback file structure
 
@@ -95,7 +78,9 @@ object DNSPreLDA {
         */
       val lines = Source.fromFile(feedbackFile).getLines().toArray.drop(1)
       val feedback: RDD[String] = sc.parallelize(lines)
-      val feedbackDataFrame = feedback.map(_.split(",")).map(row => Feedback(row(FrameTimeIndex),
+      feedback.map(_.split(","))
+        .filter(row => row(DnsSevIndex).trim.toInt == 3)
+        .map(row => Feedback(row(FrameTimeIndex),
         row(UnixTimeStampIndex),
         row(FrameLenIndex).trim.toInt,
         row(IpDstIndex),
@@ -103,17 +88,19 @@ object DNSPreLDA {
         row(DnsQryClassIndex),
         row(DnsQryTypeIndex),
         row(DnsQryRcodeIndex),
-        row(DnsSevIndex).trim.toInt)).toDF()
-      val result = feedbackDataFrame.filter("dnsSev = 3").select("frameTime", "unixTimeStamp", "frameLen", "ipDst",
-        "dnsQryName", "dnsQryClass", "dnsQryType", "dnsQryRcode")
-      val toDuplicate = result.rdd.flatMap({ case Row(row: String) => List.fill(duplicationFactor)(row) })
-      toDuplicate
+        row(DnsSevIndex).trim.toInt))
+        .flatMap(row => List.fill(duplicationFactor)(row))
+        .toDF()
+        .select("frameTime", "unixTimeStamp", "frameLen", "ipDst",
+          "dnsQryName", "dnsQryClass", "dnsQryType", "dnsQryRcode")
+      //val result = feedbackDataFrame.filter("dnsSev = 3").
+      //val toDuplicate = result.flatMap({ case Row(row: String) => List.fill(duplicationFactor)(row) })
+      //toDuplicate
     } else {
       null
     }
 
-
-    val rawDataRDD = {
+    val rawData = {
       val df = sqlContext.parquetFile(inputPath.split(",")(0))
         .filter("frame_len is not null and unix_tstamp is not null")
         .select("frame_time",
@@ -126,126 +113,22 @@ object DNSPreLDA {
           "dns_qry_rcode")
       // Need to extract raw data columns to reference index in future lines. rawDataDFColumns will be zipped with index.
       rawDataDFColumns = df.columns
-      df.map(_.mkString(","))
+      //df.map(_.mkString(","))
+      df
     }
 
     print("Read source data")
     val totalDataDF = {
       if (!scoredFileExists) {
-        rawDataRDD.toDF
+        rawData
       } else {
-        rawDataRDD.union(scoredData).toDF
+        rawData.unionAll(falsePositives)
       }
     }
 
-    val rawDataColumnWithIndex = DNSWordCreation.getColumnNames(rawDataDFColumns)
+    val dataWithWordDF = DNSWordCreation.dnsWordCreation(totalDataDF, rawDataDFColumns, sc, logger, sqlContext)
 
-    val countryCodes = sc.broadcast(DNSWordCreation.countryCodes)
-
-    logger.info("Computing subdomain info")
-
-    val dataWithSubdomainsRDD: RDD[Row] = totalDataDF.rdd.map(row =>
-      Row.fromSeq {
-        row.toSeq ++
-          DNSWordCreation.extractSubdomain(countryCodes, row.getAs[String](rawDataColumnWithIndex("dns_qry_name")))
-      })
-
-    // Update data frame schema with newly added columns. This happens b/c we are adding more than one column at once.
-    val schemaWithSubdomain = {
-      StructType(totalDataDF.schema.fields ++
-        refArrayOps(Array(StructField("domain", StringType),
-          StructField("subdomain", StringType),
-          StructField("subdomain.length", DoubleType),
-          StructField("num.periods", DoubleType))))
-    }
-
-    val dataWithSubDomainsDF = sqlContext.createDataFrame(dataWithSubdomainsRDD, schemaWithSubdomain)
-
-    logger.info("Computing subdomain entropy")
-
-    val udfStringEntropy = DNSWordCreation.udfStringEntropy()
-
-    val dataWithSubdomainEntropyDF = dataWithSubDomainsDF.withColumn("subdomain.entropy",
-      udfStringEntropy(dataWithSubDomainsDF("subdomain")))
-
-    logger.info("Calculating time cuts ...")
-
-    timeCuts = Quantiles.computeDeciles(dataWithSubdomainEntropyDF
-      .select("unix_tstamp")
-      .rdd
-      .map({ case Row(unixTimeStamp: Int) => unixTimeStamp.toDouble }))
-
-    logger.info(timeCuts.mkString(","))
-
-    logger.info("Calculating frame length cuts ...")
-
-    frameLengthCuts = Quantiles.computeDeciles(dataWithSubdomainEntropyDF
-      .select("frame_len")
-      .rdd
-      .map({ case Row(frameLen: Int) => frameLen.toDouble }))
-
-    logger.info(frameLengthCuts.mkString(","))
-
-    logger.info("Calculating subdomain length cuts ...")
-
-    subdomainLengthCuts = Quantiles.computeQuintiles(dataWithSubdomainEntropyDF
-      .filter("subdomain.length > 0")
-      .select("subdomain.length")
-      .rdd
-      .map({ case Row(subdomainLength: Double) => subdomainLength }))
-
-    logger.info(subdomainLengthCuts.mkString(","))
-
-    logger.info("Calculating entropy cuts")
-
-    entropyCuts = Quantiles.computeQuintiles(dataWithSubdomainEntropyDF
-      .filter("subdomain.entropy > 0")
-      .select("subdomain.entropy")
-      .rdd
-      .map({ case Row(subdomainEntropy: Double) => subdomainEntropy }))
-
-    logger.info(entropyCuts.mkString(","))
-
-    logger.info("Calculating num periods cuts ...")
-
-    numberPeriodsCuts = Quantiles.computeQuintiles(dataWithSubdomainEntropyDF
-      .filter("num.periods > 0")
-      .select("num.periods")
-      .rdd
-      .map({ case Row(numberPeriods: Double) => numberPeriods }))
-
-    logger.info(numberPeriodsCuts.mkString(","))
-
-    val udfGetTopDomain = DNSWordCreation.udfGetTopDomain(topDomains)
-
-    val dataWithTopDomainDF = dataWithSubdomainEntropyDF.withColumn("top_domain", udfGetTopDomain(dataWithSubdomainEntropyDF("domain")))
-
-    logger.info("Adding words")
-
-    val udfWordCreation = DNSWordCreation.udfWordCreation(frameLengthCuts, timeCuts, subdomainLengthCuts, entropyCuts, numberPeriodsCuts)
-
-    val dataWithWordDF = dataWithTopDomainDF.withColumn("word", udfWordCreation(
-      dataWithTopDomainDF("top_domain"),
-      dataWithTopDomainDF("frame_len"),
-      dataWithTopDomainDF("unix_tstamp"),
-      dataWithTopDomainDF("subdomain.length"),
-      dataWithTopDomainDF("subdomain.entropy"),
-      dataWithTopDomainDF("num.periods"),
-      dataWithTopDomainDF("dns_qry_type"),
-      dataWithTopDomainDF("dns_qry_rcode"))).select("ip_dst, word")
-
-//    val docWordCount = dataWithWordDF
-//      .map({
-//        case Row(destIP: String, word: String) =>
-//          (destIP, word) -> 1
-//      })
-//      .reduceByKey(_ + _)
-//      .map({
-//        case ((destIp, word), count) =>
-//          Seq(destIp, word, count).mkString(",")
-//      })
-//
-//    docWordCount
+    dataWithWordDF.registerTempTable("dnsData")
 
     val ipDstWordCounts = dataWithWordDF
       .map({
@@ -253,6 +136,7 @@ object DNSPreLDA {
           (destIP, word) -> 1
       })
       .reduceByKey(_ + _)
+
     ipDstWordCounts.map({case ((ipDst, word), count) => OniLDACInput(ipDst, word, count)})
   }
 
