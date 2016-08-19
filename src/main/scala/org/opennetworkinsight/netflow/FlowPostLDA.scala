@@ -14,7 +14,7 @@ import org.slf4j.Logger
   */
 object FlowPostLDA {
 
-  def flowPostLDA(inputPath: String, resultsFilePath: String, threshold: Double, topK: Int, documentResults: Array[String],
+  def flowPostLDA(inputPath: String, resultsFilePath: String, outputDelimiter: String, threshold: Double, topK: Int, documentResults: Array[String],
                   wordResults: Array[String], sc: SparkContext, sqlContext: SQLContext, logger: Logger) = {
 
     var ibyt_cuts = new Array[Double](10)
@@ -126,10 +126,9 @@ object FlowPostLDA {
     }
 
     implicit val ordering = new DataOrdering()
-
     val top : Array[(Double,Array[Any])] = filtered.takeOrdered(takeCount)
 
-    val outputRDD = sc.parallelize(top).sortBy(_._1).map(_._2.mkString("\t"))
+    val outputRDD = sc.parallelize(top).sortBy(_._1).map(_._2.mkString((outputDelimiter)))
 
     outputRDD.saveAsTextFile(resultsFilePath)
 
