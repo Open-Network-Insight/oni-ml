@@ -14,8 +14,15 @@ import scala.io.Source
   */
 object DNSPostLDA {
 
-  def dnsPostLDA(inputPath: String, resultsFilePath: String, threshold: Double, topK: Int, documentResults: Array[String],
-                 wordResults: Array[String], sc: SparkContext, sqlContext: SQLContext, logger: Logger) = {
+  def dnsPostLDA(inputPath: String,
+                 resultsFilePath: String,
+                 threshold: Double,
+                 topK: Int,
+                 ipToTopicMixes: Map[String, Array[Double]],
+                 wordToProbPerTopic : Map[String, Array[Double]],
+                 sc: SparkContext,
+                 sqlContext: SQLContext,
+                 logger: Logger) = {
 
     logger.info("DNS post LDA starts")
 
@@ -32,26 +39,9 @@ object DNSPostLDA {
     }).toSet
     val top_domains = sc.broadcast(l_top_domains)
 
-    val topics_lines = documentResults
-    val words_lines = wordResults
 
-    val l_topics = topics_lines.map(line => {
-      val ip = line.split(",")(0)
-      val text = line.split(",")(1)
-      val text_no_quote = text.replaceAll("\"", "").split(" ").map(v => v.toDouble)
-      (ip, text_no_quote)
-    }).map(elem => elem._1 -> elem._2).toMap
-
-    val topics = sc.broadcast(l_topics)
-
-    val l_words = words_lines.map(line => {
-      val word = line.split(",")(0)
-      val text = line.split(",")(1)
-      val text_no_quote = text.replaceAll("\"", "").split(" ").map(v => v.toDouble)
-      (word, text_no_quote)
-    }).map(elem => elem._1 -> elem._2).toMap
-
-    val words = sc.broadcast(l_words)
+    val topics = sc.broadcast(ipToTopicMixes)
+    val words = sc.broadcast(wordToProbPerTopic)
 
     val multidata = {
       var df = sqlContext.parquetFile(inputPath.split(",")(0)).filter("frame_len is not null and unix_tstamp is not null")
