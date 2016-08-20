@@ -19,13 +19,22 @@ object OniLDACWrapper {
 
   case class OniLDACInput(doc: String, word: String, count: Int) extends Serializable
 
+  case class OniLDACOutput(docToTopicMix: Map[String, Array[Double]], wordResults: Map[String, Array[Double]])
 
-  def runLDA(docWordCount: RDD[OniLDACInput], modelFile: String, topicDocumentFile: String, topicWordFile: String,
-             mpiPreparationCmd: String, mpiCmd: String, mpiProcessCount: String, mpiTopicCount: String,
-             localPath: String, ldaPath: String, localUser: String, dataSource: String, nodes: String):
-  (Array[String], Array[String])
-  =
-  {
+  def runLDA(docWordCount: RDD[OniLDACInput],
+             modelFile: String,
+             topicDocumentFile: String,
+             topicWordFile: String,
+             mpiPreparationCmd: String,
+             mpiCmd: String,
+             mpiProcessCount: String,
+             mpiTopicCount: String,
+             localPath: String,
+             ldaPath: String,
+             localUser: String,
+             dataSource: String,
+             nodes: String):   OniLDACOutput =  {
+
     // Create word Map Word,Index for further usage
     val wordDictionary: Map[String, Int] = {
       val words = docWordCount
@@ -52,7 +61,7 @@ object OniLDACWrapper {
     // Create model for MPI
     val model = createModel(docWordCount, wordDictionary, distinctDocument)
 
-    // Persis model.dat
+    // Persist model.dat
     val modelWriter = new PrintWriter(new File(modelFile))
     model foreach (row => modelWriter.write("%s\n".format(row)))
     modelWriter.close()
@@ -78,7 +87,7 @@ object OniLDACWrapper {
     val topicDocumentFileExists = if (topicDocumentFile != "") new File(topicDocumentFile).exists else false
     val topicWordFileExists = if (topicWordFile != "") new File(topicWordFile).exists() else false
 
-    val topicDocumentData = {
+    val documentTopicMixRawLines = {
       if (topicDocumentFileExists) {
         fromFile(topicDocumentFile).getLines().toArray
       }
@@ -94,40 +103,42 @@ object OniLDACWrapper {
     }
 
     // Create document results
-    val documentResults = getDocumentResults(topicDocumentData, documentDictionary)
+    val docToTopicMix = getDocumentResults(documentTopicMixRawLines, documentDictionary)
 
     // Create word results
-    val wordResults = getWordResults(topicWordData, wordDictionary)
+    val wordResults = getWordToProbPerTopicMap(topicWordData, wordDictionary)
 
-    (documentResults, wordResults)
-
+    OniLDACOutput(docToTopicMix, wordResults)
   }
 
-  def normalizeWord(wordProbability: String)
-  = {
+  /**
+    * getWordProbabilitiesFromTopicLine
+    *
+    * @param topicLine A line of text encoding the probabilities of the word given a topic.
+    * @return probability of each word conditioned on this topic
+    */
+  def getWordProbabilitesFromTopicLine(topicLine: String) : Array[Double] = {
 
-    val topics: Array[Double] = wordProbability.trim().split(" ").map(_.toDouble)
-    // calculate the exp of each element and return array
-    val rawWord: Array[Double] = topics.map(math.exp)
-    // sum all exponential
-    val sumRawWord = rawWord.sum
-    // calculate normalized value for each element: for each each val => exp(val)/sum
-    rawWord.map(_ / sumRawWord)
+    val logWordProbs: Array[Double] = topicLine.trim().split(" ").map(_.toDouble)
 
+    val wordProbs: Array[Double] = logWordProbs.map(math.exp)
+
+    // renormalize to account for any weirdness from the log/exp transformations
+    val sumRawWord = wordProbs.sum
+    wordProbs.map(_ / sumRawWord)
   }
 
-  def getTopicDocument(document: String, line: String)
-  = {
+  def getTopicDocument(document: String, line: String) : (String, Array[Double])  = {
     val topics = line.split(" ").map(_.toDouble)
     val topicsSum = topics.sum
 
     if (topicsSum > 0) {
       val topicsProb = topics.map(_ / topicsSum)
-      document + "," + topicsProb.mkString(" ")
+      document -> topicsProb
     }
     else {
-      val topicsProb = List.fill(20)("0.0")
-      document + "," + topicsProb.mkString(" ")
+      val topicsProb = Array.fill(20)(0d)
+      document ->  topicsProb
     }
   }
 
@@ -155,29 +166,30 @@ object OniLDACWrapper {
         + wordIndexdocWordCount(doc))
   }
 
-  def getDocumentResults(topicDocumentData: Array[String], documentDictionary: Map[Int, String])
-  = {
-    topicDocumentData.zipWithIndex.map({
-      case (k, v) => getTopicDocument(documentDictionary(v), k)
-    })
+  def getDocumentResults(topicDocumentData: Array[String],
+                         docIndexToDocument: Map[Int, String]) : Map[String, Array[Double]] = {
+
+    topicDocumentData.zipWithIndex
+      .map({case (topic, docIdx) => getTopicDocument(docIndexToDocument(docIdx), topic)})
+      .toMap
   }
 
-  def getWordResults(topicWordData: Array[String], wordDictionary: Map[String, Int])
-  ={
-    // invert wordDictionary Map[Int, String]
-    val indexWordDictionary = {
-      val addedIndex = wordDictionary.size
-      val tempWordDictionary = wordDictionary + ("0_0_0_0_0" -> addedIndex)
+  def getWordToProbPerTopicMap(topicWordData: Array[String],
+                               wordToIndex: Map[String, Int]): Map[String, Array[Double]] = {
+
+
+    val probabilityOfWordGivenTopic = topicWordData.map(getWordProbabilitesFromTopicLine).transpose
+
+    val indexToWord = {
+      val addedIndex = wordToIndex.size
+      val tempWordDictionary = wordToIndex + ("0_0_0_0_0" -> addedIndex)
       tempWordDictionary.map({
         case (k, v) => (v, k)
       })
     }
 
-    // Normalize p(w|z)
-    val probabilityOfWordGivenTopic = topicWordData.map(normalizeWord).transpose
-
-    probabilityOfWordGivenTopic.zipWithIndex.map({ case (k, v) => indexWordDictionary(v) +
-      "," + k.mkString(" ") })
+    probabilityOfWordGivenTopic.zipWithIndex.map({ case (probOfWordGivenTopic, index) => (indexToWord(index) ->
+      probOfWordGivenTopic)}).toMap
 
   }
 }

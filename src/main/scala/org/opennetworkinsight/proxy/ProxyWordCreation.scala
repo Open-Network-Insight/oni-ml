@@ -35,7 +35,7 @@ object ProxyWordCreation {
       Quantiles.bin(getTimeAsDouble(time), timeCuts).toString(),
       reqMethod,
       Quantiles.bin(Entropy.stringEntropy(uri), entropyCuts),
-      // contentType.split('/')(0), // just the top level content type for now
+      contentType.split('/')(0), // just the top level content type for now
       Quantiles.bin(agentCounts.value(userAgent), agentCuts),
       responseCode(0)).mkString("_")
 

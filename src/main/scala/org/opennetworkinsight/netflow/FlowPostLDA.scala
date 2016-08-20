@@ -14,34 +14,25 @@ import org.slf4j.Logger
   */
 object FlowPostLDA {
 
-  def flowPostLDA(inputPath: String, resultsFilePath: String, threshold: Double, topK: Int, documentResults: Array[String],
-                  wordResults: Array[String], sc: SparkContext, sqlContext: SQLContext, logger: Logger) = {
+  def flowPostLDA(inputPath: String,
+                  resultsFilePath: String,
+                  threshold: Double, topK: Int,
+                  ipToTopicMixes: Map[String, Array[Double]],
+                  ordToProbPerTopic : Map[String, Array[Double]],
+                  sc: SparkContext,
+                  sqlContext: SQLContext,
+                  logger: Logger) = {
 
     var ibyt_cuts = new Array[Double](10)
     var ipkt_cuts = new Array[Double](5)
     var time_cuts = new Array[Double](10)
 
     logger.info("loading machine learning results")
-    val topics_lines = documentResults
-    val words_lines = wordResults
 
-    val l_topics = topics_lines.map(line => {
-      val ip = line.split(",")(0)
-      val text = line.split(",")(1)
-      val text_no_quote = text.replaceAll("\"", "").split(" ").map(v => v.toDouble)
-      (ip, text_no_quote)
-    }).map(elem => elem._1 -> elem._2).toMap
+    val topics = sc.broadcast(ipToTopicMixes)
 
-    val topics = sc.broadcast(l_topics)
 
-    val l_words = words_lines.map(line => {
-      val word = line.split(",")(0)
-      val text = line.split(",")(1)
-      val text_no_quote = text.replaceAll("\"", "").split(" ").map(v => v.toDouble)
-      (word, text_no_quote)
-    }).map(elem => elem._1 -> elem._2).toMap
-
-    val words = sc.broadcast(l_words)
+    val words = sc.broadcast(ordToProbPerTopic)
 
     logger.info("loading data")
     val rawdata: RDD[String] = {
