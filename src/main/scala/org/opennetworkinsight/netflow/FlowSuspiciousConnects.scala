@@ -9,8 +9,8 @@ import org.slf4j.Logger
 
 object FlowSuspiciousConnects {
 
-  def run(config: Config, sparkContext: SparkContext, sqlContext: SQLContext, logger: Logger) = {
-
+  def run(config: Config, sparkContext: SparkContext, sqlContext: SQLContext, logger: Logger)(implicit outputDelimiter: String) = {
+    
     logger.info("Flow LDA starts")
 
     val docWordCount = FlowPreLDA.flowPreLDA(config.inputPath, config.scoresFile, config.duplicationFactor, sparkContext,
@@ -20,7 +20,7 @@ object FlowSuspiciousConnects {
       config.mpiPreparationCmd, config.mpiCmd, config.mpiProcessCount, config.mpiTopicCount, config.localPath,
       config.ldaPath, config.localUser,  config.analysis, config.nodes)
 
-    FlowPostLDA.flowPostLDA(config.inputPath, config.hdfsScoredConnect, config.threshold, config.maxResults, documentResults,
+    FlowPostLDA.flowPostLDA(config.inputPath, config.hdfsScoredConnect, config.outputDelimiter, config.threshold, config.maxResults, documentResults,
       wordResults, sparkContext, sqlContext, logger)
 
     logger.info("Flow LDA completed")

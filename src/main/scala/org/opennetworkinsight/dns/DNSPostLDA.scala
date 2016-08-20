@@ -16,6 +16,7 @@ object DNSPostLDA {
 
   def dnsPostLDA(inputPath: String,
                  resultsFilePath: String,
+                 outputDelimiter: String,
                  threshold: Double,
                  topK: Int,
                  ipToTopicMixes: Map[String, Array[Double]],
@@ -23,6 +24,7 @@ object DNSPostLDA {
                  sc: SparkContext,
                  sqlContext: SQLContext,
                  logger: Logger) = {
+
 
     logger.info("DNS post LDA starts")
 
@@ -152,7 +154,7 @@ object DNSPostLDA {
 
     val top : Array[(Double,Array[Any])] = filtered.takeOrdered(takeCount)
 
-    val outputRDD = sc.parallelize(top).sortBy(_._1).map(_._2.mkString(","))
+    val outputRDD = sc.parallelize(top).sortBy(_._1).map(_._2.mkString(outputDelimiter))
 
     outputRDD.saveAsTextFile(resultsFilePath)
 

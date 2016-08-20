@@ -16,6 +16,7 @@ object FlowPostLDA {
 
   def flowPostLDA(inputPath: String,
                   resultsFilePath: String,
+                  outputDelimiter: String,
                   threshold: Double, topK: Int,
                   ipToTopicMixes: Map[String, Array[Double]],
                   ordToProbPerTopic : Map[String, Array[Double]],
@@ -117,10 +118,9 @@ object FlowPostLDA {
     }
 
     implicit val ordering = new DataOrdering()
-
     val top : Array[(Double,Array[Any])] = filtered.takeOrdered(takeCount)
 
-    val outputRDD = sc.parallelize(top).sortBy(_._1).map(_._2.mkString(","))
+    val outputRDD = sc.parallelize(top).sortBy(_._1).map(_._2.mkString((outputDelimiter)))
 
     outputRDD.saveAsTextFile(resultsFilePath)
 

@@ -24,7 +24,8 @@ object ProxySuspiciousConnects {
       config.ldaPath, config.localUser,  config.analysis, config.nodes)
 
     val topicCount  = 20
-    ProxyPostLDA.getResults(config.inputPath, config.hdfsScoredConnect, topicCount,  config.threshold,
+    ProxyPostLDA.getResults(config.inputPath, config.hdfsScoredConnect, config.outputDelimiter,
+      topicCount,  config.threshold,
       config.maxResults, documentResults,
       wordResults, sparkContext, sqlContext, logger)
 

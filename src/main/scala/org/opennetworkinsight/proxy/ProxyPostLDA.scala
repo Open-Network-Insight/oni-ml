@@ -6,9 +6,10 @@ import org.apache.spark.broadcast.Broadcast
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.{DataFrame, Row, SQLContext}
+import org.opennetworkinsight.SuspiciousConnects
 import org.opennetworkinsight.utilities._
 import org.slf4j.Logger
-import  org.opennetworkinsight.proxy.{ProxySchema => Schema}
+import org.opennetworkinsight.proxy.{ProxySchema => Schema}
 /**
   *
   */
@@ -16,6 +17,7 @@ object ProxyPostLDA {
 
   def getResults(inputPath: String,
                  resultsFilePath: String,
+                 outputDelimiter: String,
                  topicCount: Int,
                  threshold: Double,
                  topK: Int,
@@ -73,7 +75,7 @@ object ProxyPostLDA {
     val topRows : Array[Row] = filteredDF.rdd.takeOrdered(takeCount)
 
     val outputRDD = sc.parallelize(topRows).sortBy(row => row.getDouble(scoreIndex))
-    outputRDD.map(_.mkString(",")).saveAsTextFile(resultsFilePath)
+    outputRDD.map(_.mkString(outputDelimiter)).saveAsTextFile(resultsFilePath)
 
 
     logger.info("Persisting data")
