@@ -4,6 +4,7 @@ import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
 import org.opennetworkinsight.OniLDACWrapper.OniLDACInput
 import org.apache.spark.sql.{DataFrame, Row, SQLContext}
+import org.opennetworkinsight.dns.{DNSSchema => Schema}
 import org.slf4j.Logger
 
 import scala.io.Source
@@ -93,27 +94,23 @@ object DNSPreLDA {
         .toDF()
         .select("frameTime", "unixTimeStamp", "frameLen", "ipDst",
           "dnsQryName", "dnsQryClass", "dnsQryType", "dnsQryRcode")
-      //val result = feedbackDataFrame.filter("dnsSev = 3").
-      //val toDuplicate = result.flatMap({ case Row(row: String) => List.fill(duplicationFactor)(row) })
-      //toDuplicate
     } else {
       null
     }
 
     val rawData = {
       val df = sqlContext.parquetFile(inputPath.split(",")(0))
-        .filter("frame_len is not null and unix_tstamp is not null")
-        .select("frame_time",
-          "unix_tstamp",
-          "frame_len",
-          "ip_dst",
-          "dns_qry_name",
-          "dns_qry_class",
-          "dns_qry_type",
-          "dns_qry_rcode")
+        .filter(Schema.Timestamp + " is not null and " + Schema.UnixTimestamp + " is not null")
+        .select(Schema.Timestamp,
+          Schema.UnixTimestamp,
+          Schema.FrameLength,
+          Schema.ClientIP,
+          Schema.QueryName,
+          Schema.QueryClass,
+          Schema.QueryClass,
+          Schema.QueryResponseCode)
       // Need to extract raw data columns to reference index in future lines. rawDataDFColumns will be zipped with index.
       rawDataDFColumns = df.columns
-      //df.map(_.mkString(","))
       df
     }
 
@@ -127,8 +124,6 @@ object DNSPreLDA {
     }
 
     val dataWithWordDF = DNSWordCreation.dnsWordCreation(totalDataDF, rawDataDFColumns, sc, logger, sqlContext)
-
-    dataWithWordDF.registerTempTable("dnsData")
 
     val ipDstWordCounts = dataWithWordDF
       .map({

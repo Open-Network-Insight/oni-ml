@@ -7,6 +7,7 @@ import org.apache.spark.sql.{DataFrame, Row, SQLContext}
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types.{DoubleType, StringType, StructField, StructType}
 import org.opennetworkinsight.utilities.{Entropy, Quantiles}
+import org.opennetworkinsight.dns.{DNSSchema => Schema}
 import org.slf4j.Logger
 
 import scala.io.Source
@@ -36,16 +37,16 @@ import scala.io.Source
       val dataWithSubdomainsRDD: RDD[Row] = totalDataDF.rdd.map(row =>
         Row.fromSeq {
           row.toSeq ++
-            extractSubdomain(countryCodesBC, row.getString(rawDataColumnWithIndex("dns_qry_name")))
+            extractSubdomain(countryCodesBC, row.getString(rawDataColumnWithIndex(Schema.QueryName)))
         })
 
       // Update data frame schema with newly added columns. This happens b/c we are adding more than one column at once.
       val schemaWithSubdomain = {
         StructType(totalDataDF.schema.fields ++
-          refArrayOps(Array(StructField("domain", StringType),
-            StructField("subdomain", StringType),
-            StructField("subdomain_length", DoubleType),
-            StructField("num_periods", DoubleType))))
+          refArrayOps(Array(StructField(Schema.Domain, StringType),
+            StructField(Schema.Subdomain, StringType),
+            StructField(Schema.SubdomainLength, DoubleType),
+            StructField(Schema.NumPeriods, DoubleType))))
       }
 
       val dataWithSubDomainsDF = sqlContext.createDataFrame(dataWithSubdomainsRDD, schemaWithSubdomain)
@@ -54,13 +55,13 @@ import scala.io.Source
 
       val udfStringEntropy = DNSWordCreation.udfStringEntropy()
 
-      val dataWithSubdomainEntropyDF = dataWithSubDomainsDF.withColumn("subdomain_entropy",
-        udfStringEntropy(col("subdomain")))
+      val dataWithSubdomainEntropyDF = dataWithSubDomainsDF.withColumn(Schema.SubdomainEntropy,
+        udfStringEntropy(col(Schema.Subdomain)))
 
       logger.info("Calculating time cuts ...")
 
       timeCuts = Quantiles.computeDeciles(dataWithSubdomainEntropyDF
-        .select("unix_tstamp")
+        .select(Schema.UnixTimestamp)
         .rdd
         .map({ case Row(unixTimeStamp: Long) => unixTimeStamp.toDouble }))
 
@@ -69,7 +70,7 @@ import scala.io.Source
       logger.info("Calculating frame length cuts ...")
 
       frameLengthCuts = Quantiles.computeDeciles(dataWithSubdomainEntropyDF
-        .select("frame_len")
+        .select(Schema.FrameLength)
         .rdd
         .map({ case Row(frameLen: Int) => frameLen.toDouble }))
 
@@ -78,8 +79,8 @@ import scala.io.Source
       logger.info("Calculating subdomain length cuts ...")
 
       subdomainLengthCuts = Quantiles.computeQuintiles(dataWithSubdomainEntropyDF
-        .filter("subdomain_length > 0")
-        .select("subdomain_length")
+        .filter(Schema.SubdomainLength +  " > 0")
+        .select(Schema.SubdomainLength)
         .rdd
         .map({ case Row(subdomainLength: Double) => subdomainLength }))
 
@@ -88,8 +89,8 @@ import scala.io.Source
       logger.info("Calculating entropy cuts")
 
       entropyCuts = Quantiles.computeQuintiles(dataWithSubdomainEntropyDF
-        .filter("subdomain_entropy > 0")
-        .select("subdomain_entropy")
+        .filter(Schema.SubdomainEntropy + " > 0")
+        .select(Schema.SubdomainEntropy)
         .rdd
         .map({ case Row(subdomainEntropy: Double) => subdomainEntropy }))
 
@@ -98,8 +99,8 @@ import scala.io.Source
       logger.info("Calculating num periods cuts ...")
 
       numberPeriodsCuts = Quantiles.computeQuintiles(dataWithSubdomainEntropyDF
-        .filter("num_periods > 0")
-        .select("num_periods")
+        .filter(Schema.NumPeriods + " > 0")
+        .select(Schema.NumPeriods)
         .rdd
         .map({ case Row(numberPeriods: Double) => numberPeriods }))
 
@@ -107,25 +108,24 @@ import scala.io.Source
 
       val udfGetTopDomain = DNSWordCreation.udfGetTopDomain(topDomains)
 
-      val dataWithTopDomainDF = dataWithSubdomainEntropyDF.withColumn("top_domain", udfGetTopDomain(dataWithSubdomainEntropyDF("domain")))
+      val dataWithTopDomainDF = dataWithSubdomainEntropyDF.withColumn(Schema.TopDomain, udfGetTopDomain(dataWithSubdomainEntropyDF(Schema.Domain)))
 
       logger.info("Adding words")
 
       val udfWordCreation = DNSWordCreation.udfWordCreation(frameLengthCuts, timeCuts, subdomainLengthCuts, entropyCuts, numberPeriodsCuts)
 
-      val dataWithWordDF = dataWithTopDomainDF.withColumn("word", udfWordCreation(
-        dataWithTopDomainDF("top_domain"),
-        dataWithTopDomainDF("frame_len"),
-        dataWithTopDomainDF("unix_tstamp"),
-        dataWithTopDomainDF("subdomain_length"),
-        dataWithTopDomainDF("subdomain_entropy"),
-        dataWithTopDomainDF("num_periods"),
-        dataWithTopDomainDF("dns_qry_type"),
-        dataWithTopDomainDF("dns_qry_rcode"))).select("ip_dst, word")
+      val dataWithWordDF = dataWithTopDomainDF.withColumn(Schema.Word, udfWordCreation(
+        dataWithTopDomainDF(Schema.TopDomain),
+        dataWithTopDomainDF(Schema.FrameLength),
+        dataWithTopDomainDF(Schema.UnixTimestamp),
+        dataWithTopDomainDF(Schema.SubdomainLength),
+        dataWithTopDomainDF(Schema.SubdomainEntropy),
+        dataWithTopDomainDF(Schema.NumPeriods),
+        dataWithTopDomainDF(Schema.QueryType),
+        dataWithTopDomainDF(Schema.QueryResponseCode))).select(Schema.ClientIP, Schema.Word)
 
       dataWithWordDF
     }
-
 
     val countryCodes = Set("ac", "ad", "ae", "af", "ag", "ai", "al", "am", "an", "ao", "aq", "ar", "as", "at", "au",
       "aw", "ax", "az", "ba", "bb", "bd", "be", "bf", "bg", "bh", "bi", "bj", "bm", "bn", "bo", "bq", "br", "bs", "bt",
@@ -161,8 +161,8 @@ import scala.io.Source
 
     def extractSubdomain(country_codes: Broadcast[Set[String]], url: String): Array[Any] = {
 
-      var spliturl = url.split("[.]")
-      var numparts = spliturl.length
+      val spliturl = url.split("[.]")
+      val numparts = spliturl.length
       var domain = "None"
       var subdomain = "None"
 

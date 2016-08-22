@@ -5,6 +5,7 @@ import org.apache.spark.broadcast.Broadcast
 import org.apache.spark.SparkContext
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.{DataFrame, Row, SQLContext}
+import org.opennetworkinsight.dns.{DNSSchema => Schema}
 import org.slf4j.Logger
 
 import scala.io.Source
@@ -42,15 +43,15 @@ object DNSPostLDA {
 
     val rawDataRDD = {
       val df = sqlContext.parquetFile(inputPath.split(",")(0))
-        .filter("frame_len is not null and unix_tstamp is not null")
-        .select("frame_time",
-          "unix_tstamp",
-          "frame_len",
-          "ip_dst",
-          "dns_qry_name",
-          "dns_qry_class",
-          "dns_qry_type",
-          "dns_qry_rcode")
+        .filter(Schema.Timestamp + " is not null and " + Schema.UnixTimestamp + " is not null")
+        .select(Schema.Timestamp,
+          Schema.UnixTimestamp,
+          Schema.FrameLength,
+          Schema.ClientIP,
+          Schema.QueryName,
+          Schema.QueryClass,
+          Schema.QueryClass,
+          Schema.QueryResponseCode)
       // Need to extract raw data columns to reference index in future lines. rawDataDFColumns will be zipped with index.
       rawDataDFColumns = df.columns
       df.map(_.mkString(","))
@@ -66,7 +67,7 @@ object DNSPostLDA {
 
     logger.info("Persisting data")
 
-    val filteredDF = dataScored.filter("score < " + threshold)
+    val filteredDF = dataScored.filter(Schema.Score + " < " + threshold)
 
     val count = filteredDF.count
 
@@ -76,7 +77,7 @@ object DNSPostLDA {
       topK
     }
 
-    val scoreIndex = filteredDF.schema.fieldNames.indexOf("score")
+    val scoreIndex = filteredDF.schema.fieldNames.indexOf(Schema.Score)
 
     class DataOrdering() extends Ordering[Row] {
       def compare(row1: Row, row2: Row) = row1.getDouble(scoreIndex).compare(row2.getDouble(scoreIndex))
@@ -107,7 +108,7 @@ object DNSPostLDA {
 
     def udfScoreFunction = udf((ip: String, word: String) => scoreFunction(ip,word))
 
-    dataWithWordDF.withColumn("score", udfScoreFunction(dataWithWordDF("ip_dst"), dataWithWordDF("word")))
+    dataWithWordDF.withColumn(Schema.Score, udfScoreFunction(dataWithWordDF(Schema.ClientIP), dataWithWordDF(Schema.Word)))
   }
 
 }
