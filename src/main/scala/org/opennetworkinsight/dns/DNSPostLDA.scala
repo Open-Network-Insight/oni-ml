@@ -87,9 +87,7 @@ object DNSPostLDA {
     val top : Array[Row] = filteredDF.rdd.takeOrdered(takeCount)
 
     val outputRDD = sc.parallelize(top).sortBy(row => row.getDouble(scoreIndex))
-    val outputRDD = sc.parallelize(top).sortBy(_._1).map(_._2.mkString(outputDelimiter))
-
-    outputRDD.map(_.mkString(","))saveAsTextFile(resultsFilePath)
+    outputRDD.map(_.mkString(outputDelimiter)).saveAsTextFile(resultsFilePath)
 
     logger.info("DNS Post LDA completed")
   }

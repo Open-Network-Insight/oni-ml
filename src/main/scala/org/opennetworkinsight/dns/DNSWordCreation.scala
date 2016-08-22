@@ -44,8 +44,8 @@ import scala.io.Source
         StructType(totalDataDF.schema.fields ++
           refArrayOps(Array(StructField("domain", StringType),
             StructField("subdomain", StringType),
-            StructField("subdomain.length", DoubleType),
-            StructField("num.periods", DoubleType))))
+            StructField("subdomain_length", DoubleType),
+            StructField("num_periods", DoubleType))))
       }
 
       val dataWithSubDomainsDF = sqlContext.createDataFrame(dataWithSubdomainsRDD, schemaWithSubdomain)
@@ -54,7 +54,7 @@ import scala.io.Source
 
       val udfStringEntropy = DNSWordCreation.udfStringEntropy()
 
-      val dataWithSubdomainEntropyDF = dataWithSubDomainsDF.withColumn("subdomain.entropy",
+      val dataWithSubdomainEntropyDF = dataWithSubDomainsDF.withColumn("subdomain_entropy",
         udfStringEntropy(col("subdomain")))
 
       logger.info("Calculating time cuts ...")
@@ -78,8 +78,8 @@ import scala.io.Source
       logger.info("Calculating subdomain length cuts ...")
 
       subdomainLengthCuts = Quantiles.computeQuintiles(dataWithSubdomainEntropyDF
-        .filter("subdomain.length > 0")
-        .select("subdomain.length")
+        .filter("subdomain_length > 0")
+        .select("subdomain_length")
         .rdd
         .map({ case Row(subdomainLength: Double) => subdomainLength }))
 
@@ -88,8 +88,8 @@ import scala.io.Source
       logger.info("Calculating entropy cuts")
 
       entropyCuts = Quantiles.computeQuintiles(dataWithSubdomainEntropyDF
-        .filter("subdomain.entropy > 0")
-        .select("subdomain.entropy")
+        .filter("subdomain_entropy > 0")
+        .select("subdomain_entropy")
         .rdd
         .map({ case Row(subdomainEntropy: Double) => subdomainEntropy }))
 
@@ -98,8 +98,8 @@ import scala.io.Source
       logger.info("Calculating num periods cuts ...")
 
       numberPeriodsCuts = Quantiles.computeQuintiles(dataWithSubdomainEntropyDF
-        .filter("num.periods > 0")
-        .select("num.periods")
+        .filter("num_periods > 0")
+        .select("num_periods")
         .rdd
         .map({ case Row(numberPeriods: Double) => numberPeriods }))
 
@@ -117,9 +117,9 @@ import scala.io.Source
         dataWithTopDomainDF("top_domain"),
         dataWithTopDomainDF("frame_len"),
         dataWithTopDomainDF("unix_tstamp"),
-        dataWithTopDomainDF("subdomain.length"),
-        dataWithTopDomainDF("subdomain.entropy"),
-        dataWithTopDomainDF("num.periods"),
+        dataWithTopDomainDF("subdomain_length"),
+        dataWithTopDomainDF("subdomain_entropy"),
+        dataWithTopDomainDF("num_periods"),
         dataWithTopDomainDF("dns_qry_type"),
         dataWithTopDomainDF("dns_qry_rcode"))).select("ip_dst, word")
 
@@ -229,8 +229,8 @@ import scala.io.Source
                 timeCuts: Array[Double],
                 subdomainLengthCuts: Array[Double],
                 entropyCuts: Array[Double],
-                numberPeriodsCuts: Array[Double]) = {
-      val word = Seq(topDomain ,
+                numberPeriodsCuts: Array[Double]): String = {
+      Seq(topDomain ,
         Quantiles.bin(frameLength.toDouble, frameLengthCuts) ,
         Quantiles.bin(unixTimeStamp.toDouble, timeCuts) ,
         Quantiles.bin(subdomainLength, subdomainLengthCuts) ,
