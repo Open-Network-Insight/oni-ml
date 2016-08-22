@@ -7,12 +7,14 @@ import org.apache.spark.sql.functions._
 import org.apache.spark.sql.{DataFrame, Row, SQLContext}
 import org.slf4j.Logger
 
+import scala.io.Source
+
 /**
   * Contains routines for scoring incoming netflow records from a DNS suspicious connections model.
   */
 object DNSPostLDA {
 
-  def dnsPostLDA(inputPath: String, resultsFilePath: String, threshold: Double, topK: Int, documentResults: Array[String],
+  def dnsPostLDA(inputPath: String, resultsFilePath: String,  outputDelimiter: String, threshold: Double, topK: Int, documentResults: Array[String],
                  wordResults: Array[String], sc: SparkContext, sqlContext: SQLContext, logger: Logger) = {
 
     logger.info("DNS post LDA starts")
@@ -85,6 +87,7 @@ object DNSPostLDA {
     val top : Array[Row] = filteredDF.rdd.takeOrdered(takeCount)
 
     val outputRDD = sc.parallelize(top).sortBy(row => row.getDouble(scoreIndex))
+    val outputRDD = sc.parallelize(top).sortBy(_._1).map(_._2.mkString(outputDelimiter))
 
     outputRDD.map(_.mkString(","))saveAsTextFile(resultsFilePath)
 

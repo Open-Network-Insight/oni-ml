@@ -24,7 +24,8 @@ object SuspiciousConnectsArgumentParser {
                     nodes: String = "",
                     hdfsScoredConnect: String = "",
                     threshold: Double = 1.0d,
-                    maxResults: Int = -1)
+                    maxResults: Int = -1,
+                    outputDelimiter: String = "\t")
 
   val parser: scopt.OptionParser[Config] = new scopt.OptionParser[Config]("LDA") {
 
@@ -101,6 +102,10 @@ object SuspiciousConnectsArgumentParser {
 
     opt[Int]('k', "maxresults").required().valueName("integer").
       action((x, c) => c.copy(maxResults = x)).
+      text("number of most suspicious connections to return")
+
+    opt[String]('b', "delimiter").optional().valueName("character").
+      action((x, c) => c.copy(outputDelimiter = x)).
       text("number of most suspicious connections to return")
   }
 }

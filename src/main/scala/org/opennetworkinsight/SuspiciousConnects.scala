@@ -14,6 +14,8 @@ import org.opennetworkinsight.proxy.ProxySuspiciousConnects
   */
 object SuspiciousConnects {
 
+  val OutputDelimiter = "\t"
+
   def main(args: Array[String]) {
 
     val parser = SuspiciousConnectsArgumentParser.parser
@@ -29,6 +31,8 @@ object SuspiciousConnects {
         val sparkContext = new SparkContext(sparkConfig)
         val sqlContext = new SQLContext(sparkContext)
 
+        implicit val outputDelimiter = OutputDelimiter
+
         analysis match {
           case "flow" => FlowSuspiciousConnects.run(config, sparkContext, sqlContext, logger)
           case "dns" => DNSSuspiciousConnects.run(config, sparkContext, sqlContext, logger)
@@ -43,4 +47,6 @@ object SuspiciousConnects {
 
     System.exit(0)
   }
+
+
 }
