@@ -122,6 +122,7 @@ object DNSPreLDA {
     val dataWithWordDF = DNSWordCreation.dnsWordCreation(totalDataDF, sc, logger, sqlContext)
 
     val ipDstWordCounts = dataWithWordDF
+      .select(Schema.ClientIP, Schema.Word)
       .map({
         case Row(destIP: String, word: String) =>
           (destIP, word) -> 1
