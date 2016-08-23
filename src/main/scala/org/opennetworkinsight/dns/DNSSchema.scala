@@ -21,9 +21,9 @@ object DNSSchema {
   val Domain = "domain"
   val TopDomain = "top_domain"
   val Subdomain = "subdomain"
-  val SubdomainLength = "subdomain.length"
-  val NumPeriods = "num.periods"
-  val SubdomainEntropy = "subdomain.entropy"
+  val SubdomainLength = "subdomain_length"
+  val NumPeriods = "num_periods"
+  val SubdomainEntropy = "subdomain_entropy"
 
   // output fields
 
