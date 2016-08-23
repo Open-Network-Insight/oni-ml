@@ -33,7 +33,6 @@ object DNSPreLDA {
     import sqlContext.implicits._
     val feedbackFile = scoresFile
     val scoredFileExists = new java.io.File(feedbackFile).exists
-    var rawDataDFColumns = new Array[String](0)
 
     val falsePositives: DataFrame = if (scoredFileExists) {
 
@@ -99,7 +98,7 @@ object DNSPreLDA {
     }
 
     val rawData = {
-      val df = sqlContext.parquetFile(inputPath.split(",")(0))
+      sqlContext.parquetFile(inputPath.split(",")(0))
         .filter(Schema.Timestamp + " is not null and " + Schema.UnixTimestamp + " is not null")
         .select(Schema.Timestamp,
           Schema.UnixTimestamp,
@@ -107,11 +106,8 @@ object DNSPreLDA {
           Schema.ClientIP,
           Schema.QueryName,
           Schema.QueryClass,
-          Schema.QueryClass,
+          Schema.QueryType,
           Schema.QueryResponseCode)
-      // Need to extract raw data columns to reference index in future lines. rawDataDFColumns will be zipped with index.
-      rawDataDFColumns = df.columns
-      df
     }
 
     print("Read source data")
@@ -123,7 +119,7 @@ object DNSPreLDA {
       }
     }
 
-    val dataWithWordDF = DNSWordCreation.dnsWordCreation(totalDataDF, rawDataDFColumns, sc, logger, sqlContext)
+    val dataWithWordDF = DNSWordCreation.dnsWordCreation(totalDataDF, sc, logger, sqlContext)
 
     val ipDstWordCounts = dataWithWordDF
       .map({

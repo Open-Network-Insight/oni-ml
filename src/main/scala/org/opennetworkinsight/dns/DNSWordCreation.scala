@@ -14,7 +14,7 @@ import scala.io.Source
 
   object DNSWordCreation {
 
-    def dnsWordCreation(totalDataDF: DataFrame, rawDataDFColumns: Array[String],
+    def dnsWordCreation(totalDataDF: DataFrame,
                         sc: SparkContext, logger: Logger, sqlContext: SQLContext): DataFrame ={
 
       var timeCuts = new Array[Double](10)
@@ -28,16 +28,16 @@ import scala.io.Source
         parts(1).split("[.]")(0)
       }).toSet)
 
-      val rawDataColumnWithIndex = getColumnNames(rawDataDFColumns)
-
       val countryCodesBC = sc.broadcast(countryCodes)
 
       logger.info("Computing subdomain info")
 
+      val queryNameIndex = totalDataDF.schema.fieldNames.indexOf(Schema.QueryName)
+
       val dataWithSubdomainsRDD: RDD[Row] = totalDataDF.rdd.map(row =>
         Row.fromSeq {
           row.toSeq ++
-            extractSubdomain(countryCodesBC, row.getString(rawDataColumnWithIndex(Schema.QueryName)))
+            extractSubdomain(countryCodesBC, row.getString(queryNameIndex))
         })
 
       // Update data frame schema with newly added columns. This happens b/c we are adding more than one column at once.
@@ -108,11 +108,13 @@ import scala.io.Source
 
       val udfGetTopDomain = DNSWordCreation.udfGetTopDomain(topDomains)
 
-      val dataWithTopDomainDF = dataWithSubdomainEntropyDF.withColumn(Schema.TopDomain, udfGetTopDomain(dataWithSubdomainEntropyDF(Schema.Domain)))
+      val dataWithTopDomainDF = dataWithSubdomainEntropyDF.withColumn(Schema.TopDomain,
+        udfGetTopDomain(dataWithSubdomainEntropyDF(Schema.Domain)))
 
       logger.info("Adding words")
 
-      val udfWordCreation = DNSWordCreation.udfWordCreation(frameLengthCuts, timeCuts, subdomainLengthCuts, entropyCuts, numberPeriodsCuts)
+      val udfWordCreation = DNSWordCreation.udfWordCreation(frameLengthCuts, timeCuts,
+        subdomainLengthCuts, entropyCuts, numberPeriodsCuts)
 
       val dataWithWordDF = dataWithTopDomainDF.withColumn(Schema.Word, udfWordCreation(
         dataWithTopDomainDF(Schema.TopDomain),
@@ -122,7 +124,7 @@ import scala.io.Source
         dataWithTopDomainDF(Schema.SubdomainEntropy),
         dataWithTopDomainDF(Schema.NumPeriods),
         dataWithTopDomainDF(Schema.QueryType),
-        dataWithTopDomainDF(Schema.QueryResponseCode))).select(Schema.ClientIP, Schema.Word)
+        dataWithTopDomainDF(Schema.QueryResponseCode)))
 
       dataWithWordDF
     }
@@ -208,23 +210,23 @@ import scala.io.Source
                         entropyCuts: Array[Double],
                         numberPeriodsCuts: Array[Double]) =
       udf((topDomain: String,
-           frameLength: String,
-           unixTimeStamp: String,
+           frameLength: Int,
+           unixTimeStamp: Long,
            subdomainLength: Double,
            subdomainEntropy: Double,
            numberPeriods: Double,
-           dnsQueryType: String,
-           dnsQueryRcode: String) => dnsWord(topDomain, frameLength, unixTimeStamp, subdomainLength, subdomainEntropy,
+           dnsQueryType: Int,
+           dnsQueryRcode: Int) => dnsWord(topDomain, frameLength, unixTimeStamp, subdomainLength, subdomainEntropy,
         numberPeriods, dnsQueryType, dnsQueryRcode, frameLengthCuts, timeCuts, subdomainLengthCuts, entropyCuts, numberPeriodsCuts))
 
     def dnsWord(topDomain: String,
-                frameLength: String,
-                unixTimeStamp: String,
+                frameLength: Int,
+                unixTimeStamp: Long,
                 subdomainLength: Double,
                 subdomainEntropy: Double,
                 numberPeriods: Double,
-                dnsQueryType: String,
-                dnsQueryRcode: String,
+                dnsQueryType: Int,
+                dnsQueryRcode: Int,
                 frameLengthCuts: Array[Double],
                 timeCuts: Array[Double],
                 subdomainLengthCuts: Array[Double],

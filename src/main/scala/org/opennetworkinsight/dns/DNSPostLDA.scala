@@ -8,8 +8,6 @@ import org.apache.spark.sql.{DataFrame, Row, SQLContext}
 import org.opennetworkinsight.dns.{DNSSchema => Schema}
 import org.slf4j.Logger
 
-import scala.io.Source
-
 /**
   * Contains routines for scoring incoming netflow records from a DNS suspicious connections model.
   */
@@ -19,9 +17,6 @@ object DNSPostLDA {
                  wordResults: Array[String], sc: SparkContext, sqlContext: SQLContext, logger: Logger) = {
 
     logger.info("DNS post LDA starts")
-
-    import sqlContext.implicits._
-    var rawDataDFColumns = new Array[String](0)
 
     val topicLines = documentResults.map(line => {
       val ip = line.split(",")(0)
@@ -41,8 +36,8 @@ object DNSPostLDA {
 
     val words = sc.broadcast(wordLines)
 
-    val rawDataRDD = {
-      val df = sqlContext.parquetFile(inputPath.split(",")(0))
+    val totalDataDF = {
+      sqlContext.parquetFile(inputPath.split(",")(0))
         .filter(Schema.Timestamp + " is not null and " + Schema.UnixTimestamp + " is not null")
         .select(Schema.Timestamp,
           Schema.UnixTimestamp,
@@ -50,16 +45,11 @@ object DNSPostLDA {
           Schema.ClientIP,
           Schema.QueryName,
           Schema.QueryClass,
-          Schema.QueryClass,
+          Schema.QueryType,
           Schema.QueryResponseCode)
-      // Need to extract raw data columns to reference index in future lines. rawDataDFColumns will be zipped with index.
-      rawDataDFColumns = df.columns
-      df.map(_.mkString(","))
     }
 
-    val totalDataDF = rawDataRDD.toDF
-
-    val dataWithWordDF = DNSWordCreation.dnsWordCreation(totalDataDF, rawDataDFColumns, sc, logger, sqlContext)
+    val dataWithWordDF = DNSWordCreation.dnsWordCreation(totalDataDF, sc, logger, sqlContext)
 
     logger.info("Computing conditional probability")
 
