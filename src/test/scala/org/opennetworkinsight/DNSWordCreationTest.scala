@@ -8,7 +8,7 @@ import org.scalatest.Matchers
 
 class DNSWordCreationTest extends TestingSparkContextFlatSpec with Matchers{
 
-  val countryCodesSet = DNSWordCreation.l_country_codes
+  val countryCodesSet = DNSWordCreation.countryCodes
 
   "extractSubdomain" should "return domain=None, subdomain= None, subdomain length= 0 and number of parts = 6" in {
 
@@ -20,8 +20,8 @@ class DNSWordCreationTest extends TestingSparkContextFlatSpec with Matchers{
     result.length shouldBe 4
     result(0) shouldBe "None"
     result(1) shouldBe "None"
-    result(2) shouldBe "0"
-    result(3) shouldBe "6"
+    result(2) shouldBe 0
+    result(3) shouldBe 6
   }
 
   it should "return domain=url index 'number of parts -3' , subdoamin=subset of url from index 0 to index 'number of parts" +
@@ -35,8 +35,8 @@ class DNSWordCreationTest extends TestingSparkContextFlatSpec with Matchers{
     result.length shouldBe 4
     result(0) shouldBe "amazon"
     result(1) shouldBe "services"
-    result(2) shouldBe "8"
-    result(3) shouldBe "4"
+    result(2) shouldBe 8
+    result(3) shouldBe 4
   }
 
   it should "return domain=index 'number of parts -2' and subdomain=None, subdomain length=0" in {
@@ -49,8 +49,8 @@ class DNSWordCreationTest extends TestingSparkContextFlatSpec with Matchers{
     result.length shouldBe 4
     result(0) shouldBe "amazon"
     result(1) shouldBe "None"
-    result(2) shouldBe "0"
-    result(3) shouldBe "3"
+    result(2) shouldBe 0
+    result(3) shouldBe 3
   }
 
   it should "return domain=index 'number of parts -2' and subdomain=subset of url parts from index 0 to index 'number " +
@@ -64,8 +64,8 @@ class DNSWordCreationTest extends TestingSparkContextFlatSpec with Matchers{
     result.length shouldBe 4
     result(0) shouldBe "amazon"
     result(1) shouldBe "services"
-    result(2) shouldBe "8"
-    result(3) shouldBe "3"
+    result(2) shouldBe 8
+    result(3) shouldBe 3
   }
 
   "extractSubdomain" should "return domain=None, subdomain= None, subdomain length= 0 and number of parts = 2" in {
@@ -78,42 +78,10 @@ class DNSWordCreationTest extends TestingSparkContextFlatSpec with Matchers{
     result.length shouldBe 4
     result(0) shouldBe "None"
     result(1) shouldBe "None"
-    result(2) shouldBe "0"
-    result(3) shouldBe "2"
+    result(2) shouldBe 0
+    result(3) shouldBe 2
   }
 
-
-  "binColumn" should "return 3 when the value is not bigger than the forth quintile" in {
-    val quintiles = Array(1.0, 2.0, 3.0, 4.0, 5.0)
-
-    val result = DNSWordCreation.binColumn("3.5", quintiles)
-
-    result shouldBe "3"
-  }
-
-  it should "return 5 when the value is Double.PositiveInfinity" in {
-    val quintiles = Array(1.0, 2.0, 3.0, 4.0, 5.0)
-
-    val result = DNSWordCreation.binColumn("Infinity", quintiles)
-
-    result shouldBe "5"
-  }
-
-  it should "return 0 when the value is less than the first quintile" in {
-    val quintiles = Array(1.0, 2.0, 3.0, 4.0, 5.0)
-
-    val result = DNSWordCreation.binColumn("0", quintiles)
-
-    result shouldBe "0"
-  }
-
-  it should "return 0 when no cuts" in {
-    val cuts = Array[Double]()
-
-    val result = DNSWordCreation.binColumn("Infinity", cuts)
-
-    result shouldBe "0"
-  }
 
   "entropy" should "return 2.807354922057603 with value abcdefg" in {
     val value = "abcdefg"
