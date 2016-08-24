@@ -27,55 +27,9 @@ object DNSPostLDA {
 
     logger.info("DNS post LDA starts")
 
-    var time_cuts = new Array[Double](10)
-    var frame_length_cuts = new Array[Double](10)
-    var subdomain_length_cuts = new Array[Double](5)
-    var numperiods_cuts = new Array[Double](5)
-    var entropy_cuts = new Array[Double](5)
-    var df_cols = new Array[String](0)
-
-    val l_top_domains = Source.fromFile("top-1m.csv").getLines.map(line => {
-      val parts = line.split(",")
-      parts(1).split("[.]")(0)
-    }).toSet
-    val top_domains = sc.broadcast(l_top_domains)
-
-
     val topics = sc.broadcast(ipToTopicMixes)
     val words = sc.broadcast(wordToProbPerTopic)
 
-    val multidata = {
-      var df = sqlContext.parquetFile(inputPath.split(",")(0)).filter("frame_len is not null and unix_tstamp is not null")
-      val files = inputPath.split(",")
-      for ((file, index) <- files.zipWithIndex) {
-        if (index > 1) {
-          df = df.unionAll(sqlContext.parquetFile(file).filter("frame_len is not null and unix_tstamp is not null"))
-        }
-      }
-      df = df.select("frame_time", "unix_tstamp", "frame_len", "ip_dst", "dns_qry_name", "dns_qry_class", "dns_qry_type", "dns_qry_rcode")
-      df_cols = df.columns
-      val tempRDD: org.apache.spark.rdd.RDD[String] = df.map(_.mkString(","))
-      tempRDD
-    }
-    val rawdata: org.apache.spark.rdd.RDD[String] = {
-      multidata
-    val topicLines = documentResults.map(line => {
-      val ip = line.split(",")(0)
-      val text = line.split(",")(1)
-      val text_no_quote = text.replaceAll("\"", "").split(" ").map(v => v.toDouble)
-      (ip, text_no_quote)
-    }).map(elem => elem._1 -> elem._2).toMap
-
-    val topics = sc.broadcast(topicLines)
-
-    val wordLines = wordResults.map(line => {
-      val word = line.split(",")(0)
-      val text = line.split(",")(1)
-      val text_no_quote = text.replaceAll("\"", "").split(" ").map(v => v.toDouble)
-      (word, text_no_quote)
-    }).map(elem => elem._1 -> elem._2).toMap
-
-    val words = sc.broadcast(wordLines)
 
     val totalDataDF = {
       sqlContext.parquetFile(inputPath.split(",")(0))
