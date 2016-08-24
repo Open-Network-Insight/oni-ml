@@ -7,7 +7,7 @@ import org.apache.spark.sql.{DataFrame, Row, SQLContext}
 import org.opennetworkinsight.OniLDACWrapper.OniLDACInput
 import org.opennetworkinsight.utilities._
 import org.slf4j.Logger
-import org.opennetworkinsight.proxy.{ProxySchema => Schema}
+import org.opennetworkinsight.proxy.ProxySchema._
 /**
   * Contains routines for creating the "words" for a suspicious connects analysis from incoming proxy records.
   */
@@ -20,23 +20,17 @@ object ProxyPreLDA {
 
     logger.info("Proxy pre LDA starts")
 
-    val feedbackFileExists = new java.io.File(feedbackFile).exists
-
-    val rawDataDF = sqlContext.parquetFile(inputPath).
-      filter(Schema.Date + " is not null and " + Schema.Time + " is not null and " + Schema.ClientIP + " is not null").
-      select(Schema.Date,
-        Schema.Time,
-        Schema.ClientIP,
-        Schema.Host,
-        Schema.ReqMethod,
-        Schema.UserAgent,
-        Schema.ResponseContentType,
-        Schema.RespCode,
-        Schema.FullURI)
 
 
-    // TBD: incorporate feedback data
+    val rawDataDF = sqlContext.read.parquet(inputPath).
+      filter(Date + " is not null and " + Time + " is not null and " + ClientIP + " is not null").
+      select(Date, Time, ClientIP, Host, ReqMethod, UserAgent, ResponseContentType, RespCode, FullURI)
 
+    val scoredFileExists = new java.io.File(feedbackFile).exists
+
+    logger.info("Read source data")
+
+    val totalDataDF = rawDataDF.unionAll(ProxyFeedback.loadFeedbackDF(feedbackFile, duplicationFactor, sc, sqlContext))
 
     val topDomains : Broadcast[Set[String]] = sc.broadcast(TopDomains.TOP_DOMAINS)
 
@@ -52,17 +46,17 @@ object ProxyPreLDA {
 
 
     val timeCuts =
-      Quantiles.computeDeciles(rawDataDF.select(Schema.Time).rdd.map({case Row(t: String) => getTimeAsDouble(t)}))
+      Quantiles.computeDeciles(rawDataDF.select(Time).rdd.map({case Row(t: String) => getTimeAsDouble(t)}))
 
-    val entropyCuts = Quantiles.computeQuintiles(rawDataDF.select(Schema.FullURI).
+    val entropyCuts = Quantiles.computeQuintiles(rawDataDF.select(FullURI).
       rdd.map({case Row(uri: String) => Entropy.stringEntropy(uri)}))
 
     val agentToCount: Map[String, Long] =
-      rawDataDF.select(Schema.UserAgent).rdd.map({case Row(ua: String) => (ua,1L)}).reduceByKey(_+_).collect().toMap
+      rawDataDF.select(UserAgent).rdd.map({case Row(ua: String) => (ua,1L)}).reduceByKey(_+_).collect().toMap
 
     val agentToCountBC = sc.broadcast(agentToCount)
 
-    val agentCuts = Quantiles.computeQuintiles(rawDataDF.select(Schema.UserAgent).rdd.map({case Row(ua: String) => agentToCountBC.value(ua)}))
+    val agentCuts = Quantiles.computeQuintiles(rawDataDF.select(UserAgent).rdd.map({case Row(ua: String) => agentToCountBC.value(ua)}))
 
     val wc = ipWordCountFromDF(rawDataDF, topDomains, agentToCountBC, timeCuts, entropyCuts, agentCuts)
     logger.info("proxy pre LDA completed")
@@ -79,15 +73,15 @@ object ProxyPreLDA {
 
     val udfWordCreation = ProxyWordCreation.udfWordCreation(topDomains, agentToCountBC,  timeCuts, entropyCuts, agentCuts)
 
-    val ipWordDF = dataFrame.withColumn(Schema.Word,
-      udfWordCreation(dataFrame(Schema.Host),
-        dataFrame(Schema.Time),
-        dataFrame(Schema.ReqMethod),
-        dataFrame(Schema.FullURI),
-        dataFrame(Schema.ResponseContentType),
-        dataFrame(Schema.UserAgent),
-        dataFrame(Schema.RespCode))).
-      select(Schema.ClientIP, Schema.Word)
+    val ipWordDF = dataFrame.withColumn(Word,
+      udfWordCreation(dataFrame(Host),
+        dataFrame(Time),
+        dataFrame(ReqMethod),
+        dataFrame(FullURI),
+        dataFrame(ResponseContentType),
+        dataFrame(UserAgent),
+        dataFrame(RespCode))).
+      select(ClientIP, Word)
 
     ipWordDF.rdd.map({case Row(ip, word) => ((ip.asInstanceOf[String], word.asInstanceOf[String]), 1)}).reduceByKey(_ + _).map({case ((ip, word), count) => OniLDACInput(ip, word, count) })
   }

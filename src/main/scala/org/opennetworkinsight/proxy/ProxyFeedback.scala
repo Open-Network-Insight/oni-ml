@@ -6,7 +6,7 @@ import org.apache.spark.sql.{DataFrame, SQLContext}
 
 import scala.io.Source
 
-import org.opennetworkinsight.proxy.{ProxySchema => Schema}
+import org.opennetworkinsight.proxy.ProxySchema._
 
 object ProxyFeedback {
 
@@ -22,13 +22,12 @@ object ProxyFeedback {
                       fullURI: String) extends Serializable
 
 
-  def loadFeedbackDF(sc: SparkContext, sqlContext: SQLContext, scoresFile: String, duplicationFactor: Int) = {
+  def loadFeedbackDF(feedbackFile: String, duplicationFactor: Int, sc: SparkContext, sqlContext: SQLContext) = {
 
     import sqlContext.implicits._
 
-    val feedbackFile = scoresFile
-    val scoredFileExists = new java.io.File(feedbackFile).exists
-    val falsePositives: DataFrame = if (scoredFileExists) {
+    val feedbackFileExists = new java.io.File(feedbackFile).exists
+    if (feedbackFileExists) {
 
       val dateIndex = 0
       val timeIndex = 1
@@ -57,11 +56,9 @@ object ProxyFeedback {
           row(fullURIIndex)))
         .flatMap(row => List.fill(duplicationFactor)(row))
         .toDF()
-        .select(Schema.Date, Schema.Time, Schema.ClientIP, Schema.Host,
-          Schema.ReqMethod, Schema.UserAgent, Schema.ResponseContentType, Schema.RespCode)
-    } else {
-      null
+        .select(Date, Time, ClientIP, Host, ReqMethod, UserAgent, ResponseContentType, RespCode)
+  } else {
+    null
     }
-
   }
 }
