@@ -143,7 +143,7 @@ class QuantilesTest extends TestingSparkContextFlatSpec with Matchers {
     out(4) shouldBe 10.0
   }
 
-    "bin" should "return 3 when the value is not bigger than the forth quintile" in {
+    "bin" should "return 3 when the value is not bigger than the fourth quintile" in {
       val quintiles = Array(1.0, 2.0, 3.0, 4.0, 5.0)
 
       val result = Quantiles.bin(3.5, quintiles)
