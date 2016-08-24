@@ -15,19 +15,19 @@ import org.opennetworkinsight.proxy.{ProxySchema => Schema}
   */
 object ProxyPostLDA {
 
-  def getResults(inputPath: String, resultsFilePath: String, outputDelimiter: String, topicCount: Int, threshold: Double, topK: Int,
-                 documentResults: Array[String],  wordResults: Array[String],
-                 sc: SparkContext, sqlContext: SQLContext, logger: Logger)= {
+  def getResults(inputPath: String,
+                 resultsFilePath: String,
+                 outputDelimiter: String,
+                 topicCount: Int,
+                 threshold: Double,
+                 topK: Int,
+                 ipToTopicMix: Map[String, Array[Double]],
+                 wordToProbPerTopic : Map[String, Array[Double]],
+                 sc: SparkContext,
+                 sqlContext: SQLContext,
+                 logger: Logger) = {
 
     logger.info("Proxy post LDA starts")
-
-    val ipToTopicMix : Map[String, Array[Double]] = getIpToTopicMix(documentResults)
-
-    val wordsToProbPerTopic : Map[String, Array[Double]]   = wordResults.map(line => {
-      val word = line.split(",")(0)
-      val probPerTopic = line.split(",")(1).split(' ').map(_.toDouble)
-      (word, probPerTopic)
-    }).map({case (word, probPerTopic)  => word -> probPerTopic}).toMap
 
 
     val rawDataDF = sqlContext.parquetFile(inputPath)
@@ -53,7 +53,7 @@ object ProxyPostLDA {
         Schema.FullURI)
 
     logger.info("Computing conditional probability")
-    val scoredDF : DataFrame = score(sc, rawDataDF, topicCount, ipToTopicMix, wordsToProbPerTopic)
+    val scoredDF : DataFrame = score(sc, rawDataDF, topicCount, ipToTopicMix, wordToProbPerTopic)
 
     val filteredDF = scoredDF.filter("score < " + threshold)
 
