@@ -22,7 +22,10 @@ object ProxyFeedback {
                       fullURI: String) extends Serializable
 
 
-  def loadFeedbackDF(feedbackFile: String, duplicationFactor: Int, sc: SparkContext, sqlContext: SQLContext) = {
+  def loadFeedbackDF(feedbackFile: String,
+                     duplicationFactor: Int,
+                     sc: SparkContext,
+                     sqlContext: SQLContext) : DataFrame = {
 
     import sqlContext.implicits._
 
