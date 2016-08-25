@@ -3,13 +3,13 @@ package org.opennetworkinsight.proxy
 import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.{DataFrame, SQLContext}
-
+import org.apache.spark.sql.types.{StructType, StructField, StringType}
+import org.apache.spark.sql.Row
 import scala.io.Source
 
 import org.opennetworkinsight.proxy.ProxySchema._
 
 object ProxyFeedback {
-
 
   case class Feedback(date: String,
                       timeStamp: String,
@@ -25,7 +25,7 @@ object ProxyFeedback {
   def loadFeedbackDF(feedbackFile: String,
                      duplicationFactor: Int,
                      sc: SparkContext,
-                     sqlContext: SQLContext) : DataFrame = {
+                     sqlContext: SQLContext): DataFrame = {
 
     import sqlContext.implicits._
 
@@ -59,9 +59,23 @@ object ProxyFeedback {
           row(fullURIIndex)))
         .flatMap(row => List.fill(duplicationFactor)(row))
         .toDF()
-        .select(Date, Time, ClientIP, Host, ReqMethod, UserAgent, ResponseContentType, RespCode)
-  } else {
-    null
+        .select(Date, Time, ClientIP, Host, ReqMethod, UserAgent, ResponseContentType, RespCode, FullURI)
+    } else {
+
+
+      val schema = StructType(
+        List(StructField(Date, StringType, true),
+          StructField(Time, StringType, true),
+          StructField(ClientIP, StringType, true),
+          StructField(Host, StringType, true),
+          StructField(ReqMethod, StringType, true),
+          StructField(UserAgent, StringType, true),
+          StructField(ResponseContentType, StringType, true),
+          StructField(RespCode, StringType, true),
+          StructField(FullURI, StringType, true)))
+
+
+      sqlContext.createDataFrame(sc.emptyRDD[Row], schema)
     }
   }
 }
