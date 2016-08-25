@@ -5,7 +5,7 @@ import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.{DataFrame, Row, SQLContext}
 import org.opennetworkinsight.OniLDACWrapper.OniLDACInput
-import org.opennetworkinsight.netflow.{FlowSchema => Schema}
+import org.opennetworkinsight.netflow.FlowSchema._
 import org.slf4j.Logger
 
 import scala.io.Source
@@ -104,18 +104,18 @@ object FlowPreLDA {
     logger.info("Trying to read file:  " + inputPath)
     val rawdata: DataFrame = {
       sqlContext.read.parquet(inputPath)
-        .filter(Schema.Hour + " BETWEEN 0 AND 23 AND  " +
-          Schema.Minute + " BETWEEN 0 AND 59 AND  " +
-          Schema.Second + " BETWEEN 0 AND 59")
-        .select(Schema.Hour,
-          Schema.Minute,
-          Schema.Second,
-          Schema.SourceIP,
-          Schema.DestinationIP,
-          Schema.SourcePort,
-          Schema.DestinationPort,
-          Schema.ipkt,
-          Schema.ibyt)
+        .filter(Hour + " BETWEEN 0 AND 23 AND  " +
+          Minute + " BETWEEN 0 AND 59 AND  " +
+          Second + " BETWEEN 0 AND 59")
+        .select(Hour,
+          Minute,
+          Second,
+          SourceIP,
+          DestinationIP,
+          SourcePort,
+          DestinationPort,
+          ipkt,
+          ibyt)
     }
 
     val totalDataDF: DataFrame = {
@@ -128,18 +128,12 @@ object FlowPreLDA {
 
     val dataWithWordDF = FlowWordCreation.flowWordCreation(totalDataDF, sc, logger, sqlContext)
 
-    val src_word_counts = dataWithWordDF.select(Schema.SourceIP, Schema.SourceWord)
-      .map({
-        case Row(sourceIp: String, sourceWord: String) =>
-          (sourceIp, sourceWord) -> 1
-      })
+    val src_word_counts = dataWithWordDF.select(SourceIP, SourceWord)
+      .map({ case Row(sourceIp: String, sourceWord: String) => (sourceIp, sourceWord) -> 1 })
       .reduceByKey(_ + _)
 
-    val dest_word_counts = dataWithWordDF.select(Schema.DestinationIP, Schema.DestinationWord)
-      .map({
-        case Row(destinationIp: String, destinationWord: String) =>
-          (destinationIp, destinationWord) -> 1
-      })
+    val dest_word_counts = dataWithWordDF.select(DestinationIP, DestinationWord)
+      .map({ case Row(destinationIp: String, destinationWord: String) => (destinationIp, destinationWord) -> 1 })
       .reduceByKey(_ + _)
 
     val word_counts = sc.union(src_word_counts, dest_word_counts).map({case ((ip, word), count) => OniLDACInput(ip, word, count)})
