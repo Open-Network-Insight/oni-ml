@@ -2,9 +2,9 @@ package org.opennetworkinsight.dns
 
 import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
-import org.opennetworkinsight.OniLDACWrapper.OniLDACInput
 import org.apache.spark.sql.{DataFrame, Row, SQLContext}
-import org.opennetworkinsight.dns.{DNSSchema => Schema}
+import org.opennetworkinsight.OniLDACWrapper.OniLDACInput
+import org.opennetworkinsight.dns.DNSSchema._
 import org.slf4j.Logger
 
 import scala.io.Source
@@ -13,16 +13,6 @@ import scala.io.Source
   * Contains routines for creating the "words" for a suspicious connects analysis from incoming DNS records.
   */
 object DNSPreLDA {
-
-  case class Feedback(frameTime: String,
-                      unixTimeStamp: String,
-                      frameLen: Int,
-                      ipDst: String,
-                      dnsQryName: String,
-                      dnsQryClass: String,
-                      dnsQryType: String,
-                      dnsQryRcode: String,
-                      dnsSev: Int) extends Serializable
 
   def dnsPreLDA(inputPath: String, scoresFile: String, duplicationFactor: Int,
                 sc: SparkContext, sqlContext: SQLContext, logger: Logger): RDD[OniLDACInput]
@@ -98,16 +88,16 @@ object DNSPreLDA {
     }
 
     val rawData = {
-      sqlContext.parquetFile(inputPath.split(",")(0))
-        .filter(Schema.Timestamp + " is not null and " + Schema.UnixTimestamp + " is not null")
-        .select(Schema.Timestamp,
-          Schema.UnixTimestamp,
-          Schema.FrameLength,
-          Schema.ClientIP,
-          Schema.QueryName,
-          Schema.QueryClass,
-          Schema.QueryType,
-          Schema.QueryResponseCode)
+      sqlContext.read.parquet(inputPath.split(",")(0))
+        .filter(Timestamp + " is not null and " + UnixTimestamp + " is not null")
+        .select(Timestamp,
+          UnixTimestamp,
+          FrameLength,
+          ClientIP,
+          QueryName,
+          QueryClass,
+          QueryType,
+          QueryResponseCode)
     }
 
     print("Read source data")
@@ -122,7 +112,7 @@ object DNSPreLDA {
     val dataWithWordDF = DNSWordCreation.dnsWordCreation(totalDataDF, sc, logger, sqlContext)
 
     val ipDstWordCounts = dataWithWordDF
-      .select(Schema.ClientIP, Schema.Word)
+      .select(ClientIP, Word)
       .map({
         case Row(destIP: String, word: String) =>
           (destIP, word) -> 1
@@ -131,6 +121,16 @@ object DNSPreLDA {
 
     ipDstWordCounts.map({case ((ipDst, word), count) => OniLDACInput(ipDst, word, count)})
   }
+
+  case class Feedback(frameTime: String,
+                      unixTimeStamp: String,
+                      frameLen: Int,
+                      ipDst: String,
+                      dnsQryName: String,
+                      dnsQryClass: String,
+                      dnsQryType: String,
+                      dnsQryRcode: String,
+                      dnsSev: Int) extends Serializable
 
 }
 
