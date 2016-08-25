@@ -13,7 +13,7 @@ object FlowSchema {
   val Minute = "trminute"
   val Second = "trsec"
   val Duration = "tdur"
-  val SourceIP = "sip "
+  val SourceIP = "sip"
   val DestinationIP = "dip"
   val SourcePort = "sport"
   val DestinationPort = "dport"
@@ -34,9 +34,18 @@ object FlowSchema {
   val rip = "rip"
 
   // derived and intermediate fields
+  val NumTime = "num_time"
+  val IBYTBin = "ibyt_bin"
+  val IPKTBin = "ipkt_bin"
+  val TimeBin = "time_bin"
+  val PortWord = "port_word"
+  val IpPair = "ip_pair"
 
   // output fields
 
-  val Word = "word"
-  val Score = "score"
+  val SourceWord = "source_word"
+  val DestinationWord = "destination_word"
+  val SourceScore = "source_score"
+  val DestinationScore = "destination_score"
+  val MinimumScore = "min_score"
 }

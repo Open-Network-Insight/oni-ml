@@ -1,7 +1,6 @@
 
 package org.opennetworkinsight.dns
 
-import org.apache.spark.broadcast.Broadcast
 import org.apache.spark.SparkContext
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.{DataFrame, Row, SQLContext}
@@ -24,15 +23,10 @@ object DNSPostLDA {
                  sqlContext: SQLContext,
                  logger: Logger) = {
 
-
     logger.info("DNS post LDA starts")
 
-    val topics = sc.broadcast(ipToTopicMixes)
-    val words = sc.broadcast(wordToProbPerTopic)
-
-
     val totalDataDF = {
-      sqlContext.parquetFile(inputPath.split(",")(0))
+      sqlContext.read.parquet(inputPath.split(",")(0))
         .filter(Schema.Timestamp + " is not null and " + Schema.UnixTimestamp + " is not null")
         .select(Schema.Timestamp,
           Schema.UnixTimestamp,
@@ -48,7 +42,7 @@ object DNSPostLDA {
 
     logger.info("Computing conditional probability")
 
-    val dataScored: DataFrame = score(dataWithWordDF, topics, words)
+    val dataScored: DataFrame = score(sc, dataWithWordDF, ipToTopicMixes, wordToProbPerTopic)
 
     logger.info("Persisting data")
 
@@ -78,8 +72,14 @@ object DNSPostLDA {
     logger.info("DNS Post LDA completed")
   }
 
-  def score(dataWithWordDF: DataFrame, topics: Broadcast[Map[String, Array[Double]]], words: Broadcast[Map[String, Array[Double]]]) = {
+  def score(sc: SparkContext,
+            dataWithWordDF: DataFrame,
+            ipToTopicMixes: Map[String, Array[Double]],
+            wordToProbPerTopic: Map[String, Array[Double]]) = {
     def scoreFunction(ip: String, word: String) : Double = {
+
+      val topics = sc.broadcast(ipToTopicMixes)
+      val words = sc.broadcast(wordToProbPerTopic)
 
       val uniformProb = Array.fill(20){0.05d}
 

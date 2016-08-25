@@ -1,12 +1,10 @@
 package org.opennetworkinsight.netflow
 
-import breeze.linalg._
 import org.apache.log4j.{Logger => apacheLogger}
 import org.apache.spark.SparkContext
-import org.apache.spark.rdd.RDD
-import org.apache.spark.sql.{Row, SQLContext}
-import org.opennetworkinsight.utilities.Quantiles
-import org.opennetworkinsight.netflow.{FlowColumnIndex => indexOf}
+import org.apache.spark.sql.functions._
+import org.apache.spark.sql.{DataFrame, Row, SQLContext}
+import org.opennetworkinsight.netflow.{FlowColumnIndex => indexOf, FlowSchema => Schema}
 import org.slf4j.Logger
 
 /**
@@ -19,93 +17,60 @@ object FlowPostLDA {
                   outputDelimiter: String,
                   threshold: Double, topK: Int,
                   ipToTopicMixes: Map[String, Array[Double]],
-                  ordToProbPerTopic : Map[String, Array[Double]],
+                  wordToProbPerTopic: Map[String, Array[Double]],
                   sc: SparkContext,
                   sqlContext: SQLContext,
                   logger: Logger) = {
 
-    var ibyt_cuts = new Array[Double](10)
-    var ipkt_cuts = new Array[Double](5)
-    var time_cuts = new Array[Double](10)
-
     logger.info("loading machine learning results")
 
-    val topics = sc.broadcast(ipToTopicMixes)
-
-
-    val words = sc.broadcast(ordToProbPerTopic)
-
     logger.info("loading data")
-    val rawdata: RDD[String] = {
-      val flowDataFrame = sqlContext.parquetFile(inputPath)
+    val totalDataDF: DataFrame = {
+      sqlContext.read.parquet(inputPath)
         .filter("trhour BETWEEN 0 AND 23 AND  " +
           "trminute BETWEEN 0 AND 59 AND  " +
           "trsec BETWEEN 0 AND 59")
-        .select("treceived",
-          "tryear",
-          "trmonth",
-          "trday",
-          "trhour",
-          "trminute",
-          "trsec",
-          "tdur",
-          "sip",
-          "dip",
-          "sport",
-          "dport",
-          "proto",
-          "flag",
-          "fwd",
-          "stos",
-          "ipkt",
-          "ibyt",
-          "opkt",
-          "obyt",
-          "input",
-          "output",
-          "sas",
-          "das",
-          "dtos",
-          "dir",
-          "rip")
-      flowDataFrame.map(_.mkString(","))
+        .select(Schema.TimeReceived,
+          Schema.Year,
+          Schema.Month,
+          Schema.Day,
+          Schema.Hour,
+          Schema.Minute,
+          Schema.Second,
+          Schema.Duration,
+          Schema.SourceIP,
+          Schema.DestinationIP,
+          Schema.SourcePort,
+          Schema.DestinationPort,
+          Schema.proto,
+          Schema.Flag,
+          Schema.fwd,
+          Schema.stos,
+          Schema.ipkt,
+          Schema.ibyt,
+          Schema.opkt,
+          Schema.obyt,
+          Schema.input,
+          Schema.output,
+          Schema.sas,
+          Schema.das,
+          Schema.dtos,
+          Schema.dir,
+          Schema.rip)
     }
 
-    val data_with_time = rawdata.map(_.trim.split(",")).map(FlowWordCreation.addTime)
+    val dataWithWord = FlowWordCreation.flowWordCreation(totalDataDF, sc, logger, sqlContext)
 
-    logger.info("calculating time cuts ...")
-    time_cuts = Quantiles.computeDeciles(data_with_time.map(row => row(indexOf.NUMTIME).toDouble))
-    logger.info(time_cuts.mkString(","))
-    logger.info("calculating byte cuts ...")
-    ibyt_cuts = Quantiles.computeDeciles(data_with_time.map(row => row(indexOf.IBYT).toDouble))
-    logger.info(ibyt_cuts.mkString(","))
-    logger.info("calculating pkt cuts")
-    ipkt_cuts = Quantiles.computeQuintiles(data_with_time.map(row => row(indexOf.IPKT).toDouble))
-    logger.info(ipkt_cuts.mkString(","))
+    logger.info("Computing conditional probability")
 
-    val binned_data = data_with_time.map(row => FlowWordCreation.binIbytIpktTime(row, ibyt_cuts, ipkt_cuts, time_cuts))
+    val dataWithSrcScore = score(sc, dataWithWord, ipToTopicMixes, wordToProbPerTopic, Schema.SourceScore, Schema.SourceIP, Schema.SourceWord)
+    val dataWithDestScore = score(sc, dataWithSrcScore, ipToTopicMixes, wordToProbPerTopic, Schema.DestinationScore, Schema.DestinationIP, Schema.DestinationWord)
+    val dataScored = minimumScore(dataWithDestScore)
 
-    val data_with_words = binned_data.map(row => FlowWordCreation.adjustPort(row))
+    logger.info("Persisting data")
+    val filteredDF = dataScored.filter(Schema.MinimumScore + " <" + threshold)
 
-    val src_scored = data_with_words.map(row => {
-      val topic_mix_1 = topics.value.getOrElse(row(indexOf.SOURCEIP), Array(0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05)).asInstanceOf[Array[Double]]
-      val word_prob_1 = words.value.getOrElse(row(indexOf.SOURCEWORD), Array(0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05)).asInstanceOf[Array[Double]]
-      val topic_mix_2 = topics.value.getOrElse(row(indexOf.DESTIP), Array(0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05)).asInstanceOf[Array[Double]]
-      val word_prob_2 = words.value.getOrElse(row(indexOf.DESTWORD), Array(0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05)).asInstanceOf[Array[Double]]
-      var src_score = 0.0
-      var dest_score = 0.0
-      for (i <- 0 to 19) {
-        src_score += topic_mix_1(i) * word_prob_1(i)
-        dest_score += topic_mix_2(i) * word_prob_2(i)
-      }
-      (min(src_score, dest_score), row :+ src_score :+ dest_score)
-    })
-
-
-
-    val filtered = src_scored.filter(elem => elem._1 < threshold)
-
-    val count = filtered.count
+    val count = filteredDF.count
 
     val takeCount  = if (topK == -1 || count < topK) {
       count.toInt
@@ -113,18 +78,64 @@ object FlowPostLDA {
       topK
     }
 
-    class DataOrdering() extends Ordering[(Double,Array[Any])] {
-      def compare(p1: (Double, Array[Any]), p2: (Double, Array[Any]))    = p1._1.compare(p2._1)
+    val minimumScoreIndex = filteredDF.schema.fieldNames.indexOf(Schema.MinimumScore)
+
+    class DataOrdering() extends Ordering[Row] {
+      def compare(row1: Row, row2: Row) = row1.getDouble(minimumScoreIndex).compare(row2.getDouble(minimumScoreIndex))
     }
 
     implicit val ordering = new DataOrdering()
-    val top : Array[(Double,Array[Any])] = filtered.takeOrdered(takeCount)
 
-    val outputRDD = sc.parallelize(top).sortBy(_._1).map(_._2.mkString((outputDelimiter)))
+    val top: Array[Row] = filteredDF.rdd.takeOrdered(takeCount)
 
-    outputRDD.saveAsTextFile(resultsFilePath)
+    val outputRDD = sc.parallelize(top).sortBy(row => row.getDouble(minimumScoreIndex))
+
+    // Using dropRight as we don't need last column MinimumScore, only SourceScore and DestinationScore
+    outputRDD.map(row => Row.fromSeq(row.toSeq.dropRight(1))).map(_.mkString(outputDelimiter)).saveAsTextFile(resultsFilePath)
 
     logger.info("Flow post LDA completed")
 
+  }
+
+  def score(sc: SparkContext,
+            dataFrame: DataFrame,
+            ipToTopicMixes: Map[String, Array[Double]],
+            wordToProbPerTopic: Map[String, Array[Double]],
+            newColumnName: String,
+            ipColumnName: String,
+            wordColumnName: String): DataFrame = {
+
+    val topics = sc.broadcast(ipToTopicMixes)
+    val words = sc.broadcast(wordToProbPerTopic)
+
+    def scoreFunction(ip: String, word: String): Double = {
+      val uniformProb = Array.fill(20) {
+        0.05d
+      }
+
+      val topicGivenDocProbs = topics.value.getOrElse(ip, uniformProb)
+      val wordGivenTopicProbs = words.value.getOrElse(word, uniformProb)
+
+      topicGivenDocProbs.zip(wordGivenTopicProbs)
+        .map({ case (pWordGivenTopic, pTopicGivenDoc) => pWordGivenTopic * pTopicGivenDoc })
+        .sum
+    }
+
+    def udfScoreFunction = udf((ip: String, word: String) => scoreFunction(ip, word))
+
+    dataFrame.withColumn(newColumnName, udfScoreFunction(dataFrame(ipColumnName), dataFrame(wordColumnName)))
+  }
+
+  def minimumScore(dataWithDestScore: DataFrame): DataFrame = {
+
+    def minimumScoreFunction(sourceScore: Double, destinationScore: Double): Double = {
+      scala.math.min(sourceScore, destinationScore)
+    }
+
+    def udfMinimumScoreFunction = udf((sourceScore: Double, destinationScore: Double) =>
+      minimumScoreFunction(sourceScore, destinationScore))
+
+    dataWithDestScore.withColumn(Schema.MinimumScore,
+      udfMinimumScoreFunction(dataWithDestScore(Schema.SourceScore), dataWithDestScore(Schema.DestinationScore)))
   }
 }

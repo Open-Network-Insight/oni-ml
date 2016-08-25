@@ -90,16 +90,4 @@ class DNSWordCreationTest extends TestingSparkContextFlatSpec with Matchers{
 
     result shouldBe 2.807354922057604
   }
-
-  "getColumnNames" should "return Map[String,Int] with index of each column header" in {
-    val header = Array("column1", "column2", "column3")
-
-    val result = DNSWordCreation.getColumnNames(header)
-
-    result.isEmpty shouldBe false
-    result.size shouldBe 3
-    result("column1") shouldBe 0
-    result("column2") shouldBe 1
-    result("column3") shouldBe 2
-  }
 }
