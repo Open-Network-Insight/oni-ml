@@ -27,7 +27,22 @@ object ProxyFeedback {
                      sc: SparkContext,
                      sqlContext: SQLContext): DataFrame = {
 
+    import org.apache.spark.sql._
     import sqlContext.implicits._
+
+
+
+
+    val schema = StructType(
+      List(StructField(Date, StringType, true),
+        StructField(Time, StringType, true),
+        StructField(ClientIP, StringType, true),
+        StructField(Host, StringType, true),
+        StructField(ReqMethod, StringType, true),
+        StructField(UserAgent, StringType, true),
+        StructField(ResponseContentType, StringType, true),
+        StructField(RespCode, StringType, true),
+        StructField(FullURI, StringType, true)))
 
     val feedbackFileExists = new java.io.File(feedbackFile).exists
     if (feedbackFileExists) {
@@ -46,9 +61,9 @@ object ProxyFeedback {
 
       val lines = Source.fromFile(feedbackFile).getLines().toArray.drop(1)
       val feedback: RDD[String] = sc.parallelize(lines)
-      feedback.map(_.split(","))
+      sqlContext.createDataFrame(feedback.map(_.split("\t"))
         .filter(row => row(fullURISeverityIndex).trim.toInt == 3)
-        .map(row => Feedback(row(dateIndex),
+        .map(row => Row.fromSeq(List(row(dateIndex),
           row(timeIndex),
           row(clientIpIndex),
           row(hostIndex),
@@ -56,23 +71,13 @@ object ProxyFeedback {
           row(userAgentIndex),
           row(resContTypeIndex),
           row(respCodeIndex),
-          row(fullURIIndex)))
-        .flatMap(row => List.fill(duplicationFactor)(row))
-        .toDF()
+          row(fullURIIndex))))
+        .flatMap(row => List.fill(duplicationFactor)(row)), schema)
         .select(Date, Time, ClientIP, Host, ReqMethod, UserAgent, ResponseContentType, RespCode, FullURI)
     } else {
 
 
-      val schema = StructType(
-        List(StructField(Date, StringType, true),
-          StructField(Time, StringType, true),
-          StructField(ClientIP, StringType, true),
-          StructField(Host, StringType, true),
-          StructField(ReqMethod, StringType, true),
-          StructField(UserAgent, StringType, true),
-          StructField(ResponseContentType, StringType, true),
-          StructField(RespCode, StringType, true),
-          StructField(FullURI, StringType, true)))
+
 
 
       sqlContext.createDataFrame(sc.emptyRDD[Row], schema)
