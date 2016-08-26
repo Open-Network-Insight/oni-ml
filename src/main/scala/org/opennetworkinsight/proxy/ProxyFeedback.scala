@@ -2,38 +2,21 @@ package org.opennetworkinsight.proxy
 
 import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
-import org.apache.spark.sql.{DataFrame, SQLContext}
+import org.apache.spark.sql._
 import org.apache.spark.sql.types.{StructType, StructField, StringType}
-import org.apache.spark.sql.Row
 import scala.io.Source
 
 import org.opennetworkinsight.proxy.ProxySchema._
 
 object ProxyFeedback {
 
-  case class Feedback(date: String,
-                      timeStamp: String,
-                      clientIP: String,
-                      host: String,
-                      reqMethod: String,
-                      userAgent: String,
-                      responseContentType: String,
-                      respCode: String,
-                      fullURI: String) extends Serializable
-
-
   def loadFeedbackDF(feedbackFile: String,
                      duplicationFactor: Int,
                      sc: SparkContext,
                      sqlContext: SQLContext): DataFrame = {
 
-    import org.apache.spark.sql._
-    import sqlContext.implicits._
 
-
-
-
-    val schema = StructType(
+    val feedbackSchema = StructType(
       List(StructField(Date, StringType, true),
         StructField(Time, StringType, true),
         StructField(ClientIP, StringType, true),
@@ -61,6 +44,7 @@ object ProxyFeedback {
 
       val lines = Source.fromFile(feedbackFile).getLines().toArray.drop(1)
       val feedback: RDD[String] = sc.parallelize(lines)
+
       sqlContext.createDataFrame(feedback.map(_.split("\t"))
         .filter(row => row(fullURISeverityIndex).trim.toInt == 3)
         .map(row => Row.fromSeq(List(row(dateIndex),
@@ -72,15 +56,10 @@ object ProxyFeedback {
           row(resContTypeIndex),
           row(respCodeIndex),
           row(fullURIIndex))))
-        .flatMap(row => List.fill(duplicationFactor)(row)), schema)
+        .flatMap(row => List.fill(duplicationFactor)(row)), feedbackSchema)
         .select(Date, Time, ClientIP, Host, ReqMethod, UserAgent, ResponseContentType, RespCode, FullURI)
     } else {
-
-
-
-
-
-      sqlContext.createDataFrame(sc.emptyRDD[Row], schema)
+      sqlContext.createDataFrame(sc.emptyRDD[Row], feedbackSchema)
     }
   }
 }
