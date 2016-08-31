@@ -62,21 +62,11 @@ class ProxySuspiciousConnectsModel(topicCount: Int,
     val ipToTopicMixBC = sc.broadcast(ipToTopicMIx)
     val wordToPerTopicProbBC = sc.broadcast(wordToPerTopicProb)
 
-    def scoreFunction(ip: String, word: String): Double = {
 
-      val uniformProb = Array.fill(topicCount) {
-        1.0d / topicCount
-      }
+    val scoreFunction = new ProxyScoreFunction(topicCount, ipToTopicMixBC, wordToPerTopicProbBC)
 
-      val topicGivenDocProbs = ipToTopicMixBC.value.getOrElse(ip, uniformProb)
-      val wordGivenTopicProbs = wordToPerTopicProbBC.value.getOrElse(word, uniformProb)
 
-      topicGivenDocProbs.zip(wordGivenTopicProbs)
-        .map({ case (pWordGivenTopic, pTopicGivenDoc) => pWordGivenTopic * pTopicGivenDoc })
-        .sum
-    }
-
-    def udfScoreFunction = udf((ip: String, word: String) => scoreFunction(ip, word))
+    def udfScoreFunction = udf((ip: String, word: String) => scoreFunction.score(ip, word))
     wordedDataFrame.withColumn(Score, udfScoreFunction(wordedDataFrame(ClientIP), wordedDataFrame(Word)))
   }
 }
