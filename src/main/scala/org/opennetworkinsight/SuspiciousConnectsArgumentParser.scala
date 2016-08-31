@@ -6,28 +6,28 @@ package org.opennetworkinsight
   */
 object SuspiciousConnectsArgumentParser {
 
-  case class Config(analysis: String = "",
-                    inputPath: String = "",
-                    scoresFile: String = "",
-                    duplicationFactor: Int = 1,
-                    modelFile: String = "",
-                    topicDocumentFile: String = "",
-                    topicWordFile: String = "",
-                    mpiPreparationCmd: String = "",
-                    mpiCmd: String = "",
-                    mpiProcessCount: String = "",
-                    mpiTopicCount: String = "",
-                    localPath: String = "",
-                    localUser: String = "",
-                    ldaPath: String = "",
-                    dataSource: String = "",
-                    nodes: String = "",
-                    hdfsScoredConnect: String = "",
-                    threshold: Double = 1.0d,
-                    maxResults: Int = -1,
-                    outputDelimiter: String = "\t")
+  case class SuspiciousConnectsConfig(analysis: String = "",
+                                      inputPath: String = "",
+                                      scoresFile: String = "",
+                                      duplicationFactor: Int = 1,
+                                      modelFile: String = "",
+                                      topicDocumentFile: String = "",
+                                      topicWordFile: String = "",
+                                      mpiPreparationCmd: String = "",
+                                      mpiCmd: String = "",
+                                      mpiProcessCount: String = "",
+                                      mpiTopicCount: String = "",
+                                      localPath: String = "",
+                                      localUser: String = "",
+                                      ldaPath: String = "",
+                                      dataSource: String = "",
+                                      nodes: String = "",
+                                      hdfsScoredConnect: String = "",
+                                      threshold: Double = 1.0d,
+                                      maxResults: Int = -1,
+                                      outputDelimiter: String = "\t")
 
-  val parser: scopt.OptionParser[Config] = new scopt.OptionParser[Config]("LDA") {
+  val parser: scopt.OptionParser[SuspiciousConnectsConfig] = new scopt.OptionParser[SuspiciousConnectsConfig]("LDA") {
 
     head("LDA Process", "1.1")
 
