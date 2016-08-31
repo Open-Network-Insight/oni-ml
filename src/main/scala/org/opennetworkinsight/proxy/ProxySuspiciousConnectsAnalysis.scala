@@ -42,7 +42,7 @@ object ProxySuspiciousConnectsAnalysis {
 
     // take the maxResults least probable events of probability below the threshold and sort
 
-    val filteredDF = scoredDF.filter("score < " + config.threshold)
+    val filteredDF = scoredDF.filter(Score +  " <= " + config.threshold)
     val topRows = DataFrameUtils.dfTakeOrdered(filteredDF, "score", config.maxResults)
     val scoreIndex = scoredDF.schema.fieldNames.indexOf("score")
     val outputRDD = sparkContext.parallelize(topRows).sortBy(row => row.getDouble(scoreIndex))
