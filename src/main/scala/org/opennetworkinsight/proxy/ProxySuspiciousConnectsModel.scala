@@ -149,16 +149,25 @@ object ProxySuspiciousConnectsModel {
     *
     * @return RDD of OniLDACInput objects containing the aggregated IP-word counts.
     */
-  def getIPWordCounts(sc: SparkContext, sqlContext: SQLContext, logger: Logger, rawDataDF: DataFrame, feedbackFile: String, duplicationFactor: Int, agentToCount: Map[String, Long], timeCuts: Array[Double], entropyCuts: Array[Double], agentCuts: Array[Double]): RDD[OniLDACInput] = {
+  def getIPWordCounts(sc: SparkContext,
+                      sqlContext: SQLContext,
+                      logger: Logger,
+                      inDF: DataFrame,
+                      feedbackFile: String,
+                      duplicationFactor: Int,
+                      agentToCount: Map[String, Long],
+                      timeCuts: Array[Double],
+                      entropyCuts: Array[Double],
+                      agentCuts: Array[Double]): RDD[OniLDACInput] = {
 
 
     val scoredFileExists = new java.io.File(feedbackFile).exists
 
     logger.info("Read source data")
+    val df = inDF.select(Date, Time, ClientIP, Host, ReqMethod, UserAgent, ResponseContentType, RespCode, FullURI)
+    val totalDataDF = df.unionAll(ProxyFeedback.loadFeedbackDF(sc, sqlContext, feedbackFile, duplicationFactor))
 
-    val totalDataDF = rawDataDF.unionAll(ProxyFeedback.loadFeedbackDF(sc, sqlContext, feedbackFile, duplicationFactor))
-
-    val wc = ipWordCountFromDF(sc, rawDataDF, agentToCount, timeCuts, entropyCuts, agentCuts)
+    val wc = ipWordCountFromDF(sc, totalDataDF, agentToCount, timeCuts, entropyCuts, agentCuts)
     logger.info("proxy pre LDA completed")
 
     wc
