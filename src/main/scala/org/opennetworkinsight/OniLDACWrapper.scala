@@ -21,6 +21,7 @@ object OniLDACWrapper {
 
   case class OniLDACOutput(docToTopicMix: Map[String, Array[Double]], wordResults: Map[String, Array[Double]])
 
+
   def runLDA(docWordCount: RDD[OniLDACInput],
              modelFile: String,
              topicDocumentFile: String,

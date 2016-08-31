@@ -4,12 +4,12 @@ import org.apache.spark.SparkContext
 import org.apache.spark.sql.SQLContext
 import org.opennetworkinsight.OniLDACWrapper
 import org.opennetworkinsight.OniLDACWrapper.OniLDACOutput
-import org.opennetworkinsight.SuspiciousConnectsArgumentParser.Config
+import org.opennetworkinsight.SuspiciousConnectsArgumentParser.SuspiciousConnectsConfig
 import org.slf4j.Logger
 
 object FlowSuspiciousConnects {
 
-  def run(config: Config, sparkContext: SparkContext, sqlContext: SQLContext, logger: Logger)(implicit outputDelimiter: String) = {
+  def run(config: SuspiciousConnectsConfig, sparkContext: SparkContext, sqlContext: SQLContext, logger: Logger)(implicit outputDelimiter: String) = {
     
     logger.info("Flow LDA starts")
 

@@ -8,27 +8,35 @@ import scala.io.Source
 
 import org.opennetworkinsight.proxy.ProxySchema._
 
+
 object ProxyFeedback {
 
-  def loadFeedbackDF(feedbackFile: String,
-                     duplicationFactor: Int,
-                     sc: SparkContext,
-                     sqlContext: SQLContext): DataFrame = {
+  /**
+    * Load the feedback file for proxy data.
+    * @param sc Spark context.
+    * @param sqlContext Spark SQL context.
+    * @param feedbackFile Local machine path to the proxy feedback file.
+    * @param duplicationFactor Number of words to create per flagged feedback entry.
+    * @return DataFrame of the feedback events.
+    */
+  def loadFeedbackDF(sc: SparkContext,
+                     sqlContext: SQLContext,
+                     feedbackFile: String,
+                     duplicationFactor: Int): DataFrame = {
 
 
     val feedbackSchema = StructType(
-      List(StructField(Date, StringType, true),
-        StructField(Time, StringType, true),
-        StructField(ClientIP, StringType, true),
-        StructField(Host, StringType, true),
-        StructField(ReqMethod, StringType, true),
-        StructField(UserAgent, StringType, true),
-        StructField(ResponseContentType, StringType, true),
-        StructField(RespCode, StringType, true),
-        StructField(FullURI, StringType, true)))
+      List(StructField(Date, StringType, nullable= true),
+        StructField(Time, StringType, nullable= true),
+        StructField(ClientIP, StringType, nullable= true),
+        StructField(Host, StringType, nullable= true),
+        StructField(ReqMethod, StringType, nullable= true),
+        StructField(UserAgent, StringType, nullable= true),
+        StructField(ResponseContentType, StringType, nullable= true),
+        StructField(RespCode, StringType, nullable= true),
+        StructField(FullURI, StringType, nullable= true)))
 
-    val feedbackFileExists = new java.io.File(feedbackFile).exists
-    if (feedbackFileExists) {
+    if (new java.io.File(feedbackFile).exists) {
 
       val dateIndex = 0
       val timeIndex = 1
