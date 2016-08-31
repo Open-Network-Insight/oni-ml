@@ -7,11 +7,19 @@ import org.opennetworkinsight.OniLDACWrapper.OniLDACOutput
 import org.opennetworkinsight.SuspiciousConnectsArgumentParser.SuspiciousConnectsConfig
 import org.slf4j.Logger
 
-object DNSSuspiciousConnects {
+/**
+  * Run suspicious connections analysis on DNS log data.
+  */
+
+object DNSSuspiciousConnectsAnalysis {
 
   def run(config: SuspiciousConnectsConfig, sparkContext: SparkContext, sqlContext: SQLContext, logger: Logger) = {
 
-    logger.info("DNS LDA starts")
+    logger.info("Starting DNS suspicious connects analysis.")
+
+    logger.info("Loading data")
+
+    val topicCount = 20
 
     val docWordCount = DNSPreLDA.dnsPreLDA(config.inputPath, config.scoresFile, config.duplicationFactor, sparkContext,
       sqlContext, logger)
@@ -23,7 +31,7 @@ object DNSSuspiciousConnects {
     DNSPostLDA.dnsPostLDA(config.inputPath, config.hdfsScoredConnect, config.outputDelimiter, config.threshold, config.maxResults, documentResults,
       wordResults, sparkContext, sqlContext, logger)
 
-    logger.info("DNS LDA completed")
+    logger.info("DNS  suspcicious connects analysis completed.")
   }
 
 }

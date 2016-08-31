@@ -1,5 +1,7 @@
 package org.opennetworkinsight.dns
-
+/**
+  * Data frame column names used in the DNS suspicious connects analysis.
+  */
 object DNSSchema {
 
   // input fields
