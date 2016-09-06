@@ -151,8 +151,6 @@ object ProxySuspiciousConnectsModel {
                       agentCuts: Array[Double]): RDD[OniLDACInput] = {
 
 
-    val scoredFileExists = new java.io.File(feedbackFile).exists
-
     logger.info("Read source data")
     val df = inDF.select(Date, Time, ClientIP, Host, ReqMethod, UserAgent, ResponseContentType, RespCode, FullURI)
     val totalDataDF = df.unionAll(ProxyFeedback.loadFeedbackDF(sc, sqlContext, feedbackFile, duplicationFactor))

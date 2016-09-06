@@ -1,21 +1,21 @@
 package org.opennetworkinsight
 
 
-import org.opennetworkinsight.dns.DNSWordCreation
+import org.opennetworkinsight.dns.{DNSSuspiciousConnectsAnalysis, DNSWordCreation}
 import org.opennetworkinsight.testutils.TestingSparkContextFlatSpec
-import org.opennetworkinsight.utilities.Entropy
+import org.opennetworkinsight.utilities.{CountryCodes, Entropy}
 import org.scalatest.Matchers
 
 class DNSWordCreationTest extends TestingSparkContextFlatSpec with Matchers{
 
-  val countryCodesSet = DNSWordCreation.countryCodes
+  val countryCodesSet = CountryCodes.CountryCodes
 
   "extractSubdomain" should "return domain=None, subdomain= None, subdomain length= 0 and number of parts = 6" in {
 
     val url = "123.103.104.10.in-addr.arpa"
     val countryCodes = sparkContext.broadcast(countryCodesSet)
 
-    val result = DNSWordCreation.extractSubdomain(countryCodes, url)
+    val result = DNSSuspiciousConnectsAnalysis.extractSubdomain(countryCodes, url)
 
     result.length shouldBe 4
     result(0) shouldBe "None"
@@ -30,7 +30,7 @@ class DNSWordCreationTest extends TestingSparkContextFlatSpec with Matchers{
     val url = "services.amazon.com.mx"
     val countryCodes = sparkContext.broadcast(countryCodesSet)
 
-    val result = DNSWordCreation.extractSubdomain(countryCodes, url)
+    val result = DNSSuspiciousConnectsAnalysis.extractSubdomain(countryCodes, url)
 
     result.length shouldBe 4
     result(0) shouldBe "amazon"
@@ -44,7 +44,7 @@ class DNSWordCreationTest extends TestingSparkContextFlatSpec with Matchers{
     val url = "amazon.com.mx"
     val countryCodes = sparkContext.broadcast(countryCodesSet)
 
-    val result = DNSWordCreation.extractSubdomain(countryCodes, url)
+    val result = DNSSuspiciousConnectsAnalysis.extractSubdomain(countryCodes, url)
 
     result.length shouldBe 4
     result(0) shouldBe "amazon"
@@ -59,7 +59,7 @@ class DNSWordCreationTest extends TestingSparkContextFlatSpec with Matchers{
     val url = "services.amazon.com"
     val countryCodes = sparkContext.broadcast(countryCodesSet)
 
-    val result = DNSWordCreation.extractSubdomain(countryCodes, url)
+    val result = DNSSuspiciousConnectsAnalysis.extractSubdomain(countryCodes, url)
 
     result.length shouldBe 4
     result(0) shouldBe "amazon"
@@ -73,7 +73,7 @@ class DNSWordCreationTest extends TestingSparkContextFlatSpec with Matchers{
     val url = "amazon.com"
     val countryCodes = sparkContext.broadcast(countryCodesSet)
 
-    val result = DNSWordCreation.extractSubdomain(countryCodes, url)
+    val result = DNSSuspiciousConnectsAnalysis.extractSubdomain(countryCodes, url)
 
     result.length shouldBe 4
     result(0) shouldBe "None"
