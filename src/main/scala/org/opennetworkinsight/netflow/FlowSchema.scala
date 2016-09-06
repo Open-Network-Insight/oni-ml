@@ -40,6 +40,13 @@ object FlowSchema {
   val TimeBin = "time_bin"
   val PortWord = "port_word"
   val IpPair = "ip_pair"
+  val SourceProbabilities = "sourceProb"
+  val DestinationProbabilities = "destProb"
+
+  // temporary fields
+  val Probabilities = "probabilities"
+  val Doc = "doc"
+
 
   // output fields
 
