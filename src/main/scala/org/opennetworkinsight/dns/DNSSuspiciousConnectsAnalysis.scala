@@ -51,19 +51,15 @@ object DNSSuspiciousConnectsAnalysis {
     val queryNameIndex = rawDataDF.schema.fieldNames.indexOf(QueryName)
 
     val dataWithSubdomainsRDD: RDD[Row] = rawDataDF.rdd.map(row =>
-      Row.fromSeq {
-        row.toSeq ++
-          extractSubdomain(countryCodesBC, row.getString(queryNameIndex))
-      })
+      Row.fromSeq {row.toSeq ++ extractSubdomain(countryCodesBC, row.getString(queryNameIndex))})
 
     // Update data frame schema with newly added columns. This happens b/c we are adding more than one column at once.
-    val schemaWithSubdomain = {
-      StructType(rawDataDF.schema.fields ++
-        refArrayOps(Array(StructField(Domain, StringType),
+    val schemaWithSubdomain = StructType(rawDataDF.schema.fields ++
+      refArrayOps(Array(StructField(Domain, StringType),
           StructField(Subdomain, StringType),
           StructField(SubdomainLength, DoubleType),
           StructField(NumPeriods, DoubleType))))
-    }
+
 
     val dataWithSubDomainsDF = sqlContext.createDataFrame(dataWithSubdomainsRDD, schemaWithSubdomain)
 
