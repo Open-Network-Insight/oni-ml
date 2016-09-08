@@ -34,7 +34,8 @@ object OniLDACWrapper {
              ldaPath: String,
              localUser: String,
              dataSource: String,
-             nodes: String):   OniLDACOutput =  {
+             nodes: String,
+             prgSeed: Option[Long]):   OniLDACOutput =  {
 
     // Create word Map Word,Index for further usage
     val wordDictionary: Map[String, Int] = {
@@ -80,8 +81,11 @@ object OniLDACWrapper {
 
     // Execute MPI
 
+    val prgSeedString = if (prgSeed.nonEmpty) prgSeed.get.toString() else ""
+
     sys.process.Process(Seq(mpiCmd, "-n", mpiProcessCount, "-f", "machinefile", "./lda", "est", "2.5",
-      mpiTopicCount, "settings.txt", mpiProcessCount, modelFile, "random", localPath), new java.io.File(ldaPath)) #> (System.out) !!
+      mpiTopicCount, "settings.txt",  modelFile, "random", localPath, prgSeedString),
+      new java.io.File(ldaPath)) #> (System.out) !!
 
     // Read topic info per document
 
