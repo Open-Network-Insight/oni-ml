@@ -5,7 +5,7 @@ import org.apache.spark.broadcast.Broadcast
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.{DataFrame, Row, SQLContext}
-import org.opennetworkinsight.OniLDACWrapper
+import org.opennetworkinsight.{OniLDACWrapper, SuspiciousConnectsScoreFunction}
 import org.opennetworkinsight.OniLDACWrapper.{OniLDACInput, OniLDACOutput}
 import org.opennetworkinsight.SuspiciousConnectsArgumentParser.SuspiciousConnectsConfig
 import org.opennetworkinsight.utilities._
@@ -63,7 +63,7 @@ class ProxySuspiciousConnectsModel(topicCount: Int,
     val wordToPerTopicProbBC = sc.broadcast(wordToPerTopicProb)
 
 
-    val scoreFunction = new ProxyScoreFunction(topicCount, ipToTopicMixBC, wordToPerTopicProbBC)
+    val scoreFunction = new SuspiciousConnectsScoreFunction(topicCount, ipToTopicMixBC, wordToPerTopicProbBC)
 
 
     def udfScoreFunction = udf((ip: String, word: String) => scoreFunction.score(ip, word))
