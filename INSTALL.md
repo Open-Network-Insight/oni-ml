@@ -2,20 +2,7 @@
 
 Machine learning routines for OpenNetworkInsight, version 1.1
 
-At present, oni-ml contains routines for performing *suspicious connections* analyses on netflow, DNS or proxy data gathered from a network. These
-analyses consume a (possibly very lage) collection of network events and produces a list of the events that considered to be the least probable (or most suspicious).
-
-oni-ml is designed to be run as a component of Open-Network-Insight. It relies on the ingest component of Open-Network-Insight to collect and load
-netflow and DNS records, and oni-ml will try to load data to the operational analytics component of Open-Network-Insight.  It is strongly suggested that when experimenting with oni-ml, you do so as a part of the unified Open-Network-Insight system: Please see [the Open-Network-Insight wiki](https://github.com/Open-Network-Insight/open-network-insight/wiki)
-
-The remaining instructions in this README file treat oni-ml in a stand-alone fashion that might be helpful for customizing and troubleshooting the
-component.
-
-## Getting Started
-
-
-
-### Prerequisites, Installation and Configuration
+## Prerequisites, Installation and Configuration
 
 Install and configure oni-ml as a part of the Open-Network-Insight project, per the instruction at
 [the Open-Network-Insight wiki](https://github.com/Open-Network-Insight/open-network-insight/wiki).
@@ -37,92 +24,8 @@ Names and language that we will use from the configuration variables for Open-Ne
 
 Load data for consumption by oni-ml by running [oni-ingest](https://github.com/Open-Network-Insight/oni-ingest/tree/dev).
 
-The data format and location where the data is stored differs for netflow and DNS analyses.
 
-**Netflow Data**
-
-Netflow data for the year YEAR, month  MONTH, and day DAY is stored in HDFS at `HUSER/flow/csv/y=YEAR/m=MONTH/d=DAY/*`
-
-Data for oni-ml netflow analyses is currently stored in text csv files using the following schema:
-
-- time: String
-- year: Double
-- month: Double
-- day: Double
-- hour: Double
-- minute: Double
-- second: Double
-- time of duration: Double
-- source IP: String
-- destination IP: String
-- source port: Double
-- dport: Double
-- proto: String
-- flag: String
-- fwd: Double
-- stos: Double
-- ipkt: Double.
-- ibyt: Double
-- opkt: Double
-- obyt: Double
-- input: Double
-- output: Double
-- sas: String
-- das: Sring
-- dtos: String
-- dir: String
-- rip: String
-
-**DNS Data**
-
-DNS data for the year YEAR, month MONTH and day DAY is stored in Hive at `HUSER/dns/hive/y=YEAR/m=MONTH/d=DAY/`
-
-The Hive tables containing DNS data for oni-ml analyses have the following schema:
-
-- frame_time: STRING
-- unix_tstamp: BIGINT
-- frame_len: INT3. ip_dst: STRING
-- ip_src: STRING
-- dns_qry_name: STRING
-- dns_qry_class: STRING
-- dns_qry_type: INT
-- dns_qry_rcode: INT
-- dns_a: STRING
-
-**PROXY DATA**
-
-- proxy_date: STRING
-- proxy_time: STRING  
-- proxy_clientip: STRING                           
-- proxy_host: STRING    
-- proxy_reqmethod: STRING                                    
-- proxy_useragent: STRING                                      
-- proxy_resconttype: STRING                                      
-- proxy_duration: INT                                         
-- proxy_username: STRING                                      
-- proxy_authgroup: STRING                                      
-- proxy_exceptionid: STRING                                      
-- proxy_filterresult: STRING                                      
-- proxy_webcat: STRING                                      
-- proxy_referer: STRING                                      
-- proxy_respcode: STRING                                      
-- proxy_action: STRING                                      
-- proxy_urischeme: STRING                                      
-- proxy_uriport: STRING                                      
-- proxy_uripath: STRING                                      
-- proxy_uriquery: STRING                                      
-- proxy_uriextension: STRING                                      
-- proxy_serverip: STRING                                      
-- proxy_scbytes: INT                                         
-- proxy_csbytes: INT                                         
-- proxy_virusid: STRING                                      
-- proxy_bcappname: STRING                                      
-- proxy_bcappoper: STRING                                      
-- proxy_fulluri: STRING
-
-
-
-### Run a suspicious connects analysis
+## Run a suspicious connects analysis
 
 To run a suspicious connects analysis, execute the  `ml_ops.sh` script in the ml directory of the MLNODE.
 ```
@@ -146,22 +49,6 @@ As the maximum probability of an event is 1, a threshold of 1 can be used to sel
 ```
 
 
-### oni-ml output
-
-Final results are stored in the following file on HDFS:
-`HPATH\scores\SOURCE_results.csv` 
-It is a csv file in which network events annotated with estimated probabilities and sorted in ascending order.
-
-A successful run of oni-ml will also create and populate a directory at `LPATH/YYYYMMDD` where `YYYYMMDD` is the date argument provided to `ml_ops.sh` 
-This directory will contain the following files generated during the LDA procedure used for topic-modelling:
-
-- model.dat An intermediate file in which each line corresponds to a "document" (the flow traffic about an IP, or the DNS queries of a client IP), and contains the size of the document and the list of "words" (simplified network events) occurring in the document with their frequencies. Words are encoded as integers per the file words.dat. 
-- final.beta  A space-separated text file that contains the logs of the probabilities of each word given each topic. Each line corresponds to a topic and the words are columns. 
-- final.gamma A space-separated text file that contains the unnormalized probabilities of each topic given each document. Each line corresponds to a document and the topics are the columns.
-- final.other  Auxilliary information from the LDA run: Number of topics, number of terms, alpha.
-- likelihood.dat Convergence information for the LDA run.
-
-In addition, on each worker node identified in NODES, in the `LPATH/YYYYMMDD` directory files of the form `<worker index>.beta` and `<workder index>.gamma`, these are local temporary files that are combined to form `final.beta` and `final.gamma`, respectively.
 
 ## Licensing
 
