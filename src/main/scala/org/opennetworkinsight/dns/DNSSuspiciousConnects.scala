@@ -13,6 +13,8 @@ object DNSSuspiciousConnects {
 
     logger.info("DNS LDA starts")
 
+    val topicCount = 20
+
     val docWordCount = DNSPreLDA.dnsPreLDA(config.inputPath, config.scoresFile, config.duplicationFactor, sparkContext,
       sqlContext, logger)
 
@@ -20,7 +22,7 @@ object DNSSuspiciousConnects {
       config.mpiPreparationCmd, config.mpiCmd, config.mpiProcessCount, config.mpiTopicCount, config.localPath,
       config.ldaPath, config.localUser, config.analysis, config.nodes)
 
-    DNSPostLDA.dnsPostLDA(config.inputPath, config.hdfsScoredConnect, config.outputDelimiter, config.threshold, config.maxResults, documentResults,
+    DNSPostLDA.dnsPostLDA(config.inputPath, config.hdfsScoredConnect, config.outputDelimiter, config.threshold, config.maxResults, topicCount, documentResults,
       wordResults, sparkContext, sqlContext, logger)
 
     logger.info("DNS LDA completed")
