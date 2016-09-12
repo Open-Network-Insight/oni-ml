@@ -85,7 +85,7 @@ object ProxySuspiciousConnectsModel {
     * @param sqlContext   SQL context.
     * @param logger       Logge object.
     * @param config       SuspiciousConnetsArgumnetParser.Config object containg CLI arguments.
-    * @param df           Dataframe for training data, with columns Host, Time, ReqMethod, FullURI, ResponseContentType,
+    * @param inDF           Dataframe for training data, with columns Host, Time, ReqMethod, FullURI, ResponseContentType,
     *                     UserAgent, RespCode (as defined in ProxySchema object).
     * @param topicCount   Number of topics used for topic modelling during training.
     * @return ProxySuspiciousConnectsModel
@@ -94,10 +94,14 @@ object ProxySuspiciousConnectsModel {
                     sqlContext: SQLContext,
                     logger: Logger,
                     config: SuspiciousConnectsConfig,
-                    df: DataFrame,
+                    inDF: DataFrame,
                     topicCount: Int): ProxySuspiciousConnectsModel = {
 
     logger.info("training new proxy suspcious connects model")
+
+    
+    val df = inDF.select(Date, Time, ClientIP, Host, ReqMethod, UserAgent, ResponseContentType, RespCode, FullURI)
+      .unionAll(ProxyFeedback.loadFeedbackDF(sparkContext, sqlContext, config.scoresFile, config.duplicationFactor))
 
     val timeCuts =
       Quantiles.computeDeciles(df.select(Time).rdd.map({ case Row(t: String) => TimeUtilities.getTimeAsDouble(t) }))
@@ -153,9 +157,8 @@ object ProxySuspiciousConnectsModel {
 
     logger.info("Read source data")
     val df = inDF.select(Date, Time, ClientIP, Host, ReqMethod, UserAgent, ResponseContentType, RespCode, FullURI)
-    val totalDataDF = df.unionAll(ProxyFeedback.loadFeedbackDF(sc, sqlContext, feedbackFile, duplicationFactor))
 
-    val wc = ipWordCountFromDF(sc, totalDataDF, agentToCount, timeCuts, entropyCuts, agentCuts)
+    val wc = ipWordCountFromDF(sc, df, agentToCount, timeCuts, entropyCuts, agentCuts)
     logger.info("proxy pre LDA completed")
 
     wc
