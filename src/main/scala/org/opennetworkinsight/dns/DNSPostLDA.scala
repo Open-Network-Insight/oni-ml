@@ -4,6 +4,7 @@ package org.opennetworkinsight.dns
 import org.apache.spark.SparkContext
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.{DataFrame, Row, SQLContext}
+import org.opennetworkinsight.SuspiciousConnectsScoreFunction
 import org.opennetworkinsight.dns.DNSSchema._
 import org.slf4j.Logger
 
@@ -17,6 +18,7 @@ object DNSPostLDA {
                  outputDelimiter: String,
                  threshold: Double,
                  topK: Int,
+                 topicCount: Int,
                  ipToTopicMixes: Map[String, Array[Double]],
                  wordToProbPerTopic : Map[String, Array[Double]],
                  sc: SparkContext,
@@ -25,24 +27,22 @@ object DNSPostLDA {
 
     logger.info("DNS post LDA starts")
 
-    val totalDataDF = {
-      sqlContext.read.parquet(inputPath.split(",")(0))
-        .filter(Timestamp + " is not null and " + UnixTimestamp + " is not null")
-        .select(Timestamp,
-          UnixTimestamp,
-          FrameLength,
-          ClientIP,
-          QueryName,
-          QueryClass,
-          QueryType,
-          QueryResponseCode)
-    }
+    val totalDataDF = sqlContext.read.parquet(inputPath)
+      .filter(Timestamp + " is not null and " + UnixTimestamp + " is not null")
+      .select(Timestamp,
+        UnixTimestamp,
+        FrameLength,
+        ClientIP,
+        QueryName,
+        QueryClass,
+        QueryType,
+        QueryResponseCode)
 
     val dataWithWordDF = DNSWordCreation.dnsWordCreation(totalDataDF, sc, logger, sqlContext)
 
     logger.info("Computing conditional probability")
 
-    val dataScored: DataFrame = score(sc, dataWithWordDF, ipToTopicMixes, wordToProbPerTopic)
+    val dataScored: DataFrame = score(sc, dataWithWordDF, ipToTopicMixes, wordToProbPerTopic, topicCount)
 
     logger.info("Persisting data")
 
@@ -75,23 +75,18 @@ object DNSPostLDA {
   def score(sc: SparkContext,
             dataWithWordDF: DataFrame,
             ipToTopicMixes: Map[String, Array[Double]],
-            wordToProbPerTopic: Map[String, Array[Double]]) = {
-    def scoreFunction(ip: String, word: String) : Double = {
+            wordToProbPerTopic: Map[String, Array[Double]],
+            topicCount: Int) = {
 
-      val topics = sc.broadcast(ipToTopicMixes)
-      val words = sc.broadcast(wordToProbPerTopic)
 
-      val uniformProb = Array.fill(20){0.05d}
 
-      val topicGivenDocProbs  = topics.value.getOrElse(ip, uniformProb)
-      val wordGivenTopicProbs = words.value.getOrElse(word, uniformProb)
 
-      topicGivenDocProbs.zip(wordGivenTopicProbs)
-        .map({case (pWordGivenTopic, pTopicGivenDoc) => pWordGivenTopic*pTopicGivenDoc })
-        .sum
-    }
+    val ipToTopicMixBC = sc.broadcast(ipToTopicMixes)
+    val wordToPerTopicProbBC = sc.broadcast(wordToProbPerTopic)
 
-    def udfScoreFunction = udf((ip: String, word: String) => scoreFunction(ip,word))
+    val scoreFunction = new SuspiciousConnectsScoreFunction(topicCount, ipToTopicMixBC, wordToPerTopicProbBC)
+
+    def udfScoreFunction = udf((ip: String, word: String) => scoreFunction.score(ip,word))
 
     dataWithWordDF.withColumn(Score, udfScoreFunction(dataWithWordDF(ClientIP), dataWithWordDF(Word)))
   }

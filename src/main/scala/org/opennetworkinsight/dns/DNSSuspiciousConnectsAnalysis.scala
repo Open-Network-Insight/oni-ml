@@ -69,9 +69,8 @@ object DNSSuspiciousConnectsAnalysis {
       config.mpiPreparationCmd, config.mpiCmd, config.mpiProcessCount, config.mpiTopicCount, config.localPath,
       config.ldaPath, config.localUser, config.analysis, config.nodes)
 
-    DNSPostLDA.dnsPostLDA(config.inputPath, config.hdfsScoredConnect, config.outputDelimiter, config.threshold, config.maxResults, documentResults,
+    DNSPostLDA.dnsPostLDA(config.inputPath, config.hdfsScoredConnect, config.outputDelimiter, config.threshold, config.maxResults, topicCount, documentResults,
       wordResults, sparkContext, sqlContext, logger)
-
     logger.info("DNS  suspcicious connects analysis completed.")
   }
 
