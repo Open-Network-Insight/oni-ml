@@ -21,6 +21,7 @@ object OniLDACWrapper {
 
   case class OniLDACOutput(docToTopicMix: Map[String, Array[Double]], wordResults: Map[String, Array[Double]])
 
+
   def runLDA(docWordCount: RDD[OniLDACInput],
              modelFile: String,
              topicDocumentFile: String,
@@ -69,7 +70,7 @@ object OniLDACWrapper {
     // Copy model.dat to each machinefile node
     val nodeList = nodes.replace("'","").split(",")
     for (node <- nodeList){
-      sys.process.Process(Seq("ssh", node, "mkdir " + localUser + "/ml/" + dataSource)).!
+      sys.process.Process(Seq("ssh", node, "mkdir -p " + localUser + "/ml/" + dataSource)).!
       sys.process.Process(Seq("scp", "-r", localPath, node + ":" + localUser + "/ml/" + dataSource )).!
     }
 

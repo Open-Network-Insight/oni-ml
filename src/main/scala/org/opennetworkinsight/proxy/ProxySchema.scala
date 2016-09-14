@@ -1,5 +1,8 @@
 package org.opennetworkinsight.proxy
 
+/**
+  * Data frame column names used in the proxy suspicious connects analysis.
+  */
 object ProxySchema {
 
   // fields from the input
@@ -34,6 +37,7 @@ object ProxySchema {
   val FullURI = "fulluri"
 
   // output fields
+
   val Word = "word"
   val Score = "score"
 }

@@ -68,7 +68,7 @@ object DNSPreLDA {
         */
       val lines = Source.fromFile(feedbackFile).getLines().toArray.drop(1)
       val feedback: RDD[String] = sc.parallelize(lines)
-      feedback.map(_.split(","))
+      feedback.map(_.split("\t"))
         .filter(row => row(DnsSevIndex).trim.toInt == 3)
         .map(row => Feedback(row(FrameTimeIndex),
         row(UnixTimeStampIndex),

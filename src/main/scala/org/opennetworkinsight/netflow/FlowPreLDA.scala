@@ -80,7 +80,7 @@ object FlowPreLDA {
 
       val feedback: RDD[String] = sc.parallelize(rowsToDuplicate)
 
-      feedback.map(_.split(","))
+      feedback.map(_.split("\t"))
         .filter(row => row.length == 22 && row(scoreIndex).trim.toInt == 3)
         .map(row => row :+
           row(timeStartIndex).split(" ")(1).split(":")(0) :+

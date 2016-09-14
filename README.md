@@ -11,29 +11,7 @@ netflow and DNS records, and oni-ml will try to load data to the operational ana
 The remaining instructions in this README file treat oni-ml in a stand-alone fashion that might be helpful for customizing and troubleshooting the
 component.
 
-## Getting Started
-
-
-
-### Prerequisites, Installation and Configuration
-
-Install and configure oni-ml as a part of the Open-Network-Insight project, per the instruction at
-[the Open-Network-Insight wiki](https://github.com/Open-Network-Insight/open-network-insight/wiki).
-
-The oni-ml routines must be built into a jar stored at `target/scala-2.10/oni-ml-assembly-1.1.jar` on the master node. This requires Scala 2.10 or later to be installed on the system building the jar. To build the jar, from the top-level of the oni-ml repo, execute the command `sbt assembly`.
-
-Names and language that we will use from the configuration variables for Open-Network-Insight (that are set in the file [duxbay.conf](https://github.com/Open-Network-Insight/oni-setup/blob/dev/duxbay.conf))
-
-- MLNODE The node from which the oni-ml routines are invoked
-- NODES The list of MPI worker nodes that execute the topic modelling analysis
-- HUSER An HDFS user path that will be the base path for the solution; this is usually the same user that you created to run the solution
-- LPATH The local path for the ML intermediate and final results, dynamically created and populated when the pipeline runs
-- HPATH Location for storing intermediate results of the analysis on HDFS.
-- MPI_CMD : command for executing MPI on your system, eg. `mpiexec` or `mpiexec.hydra` This will vary with your MPI installation!
-- MPI_PREP_CMD : a command that must be run before executing MPI on your system, such as sourcing a file of environment variables or exporting a path. May be empty. Will vary with your MPI installation.
-- PROCESS_COUNT : Number of processes executing in MPI.
-
-### Prepare data for input 
+## Prepare data for input 
 
 Load data for consumption by oni-ml by running [oni-ingest](https://github.com/Open-Network-Insight/oni-ingest/tree/dev).
 
@@ -91,34 +69,34 @@ The Hive tables containing DNS data for oni-ml analyses have the following schem
 
 **PROXY DATA**
 
-- proxy_date: STRING
-- proxy_time: STRING  
-- proxy_clientip: STRING                           
-- proxy_host: STRING    
-- proxy_reqmethod: STRING                                    
-- proxy_useragent: STRING                                      
-- proxy_resconttype: STRING                                      
-- proxy_duration: INT                                         
-- proxy_username: STRING                                      
-- proxy_authgroup: STRING                                      
-- proxy_exceptionid: STRING                                      
-- proxy_filterresult: STRING                                      
-- proxy_webcat: STRING                                      
-- proxy_referer: STRING                                      
-- proxy_respcode: STRING                                      
-- proxy_action: STRING                                      
-- proxy_urischeme: STRING                                      
-- proxy_uriport: STRING                                      
-- proxy_uripath: STRING                                      
-- proxy_uriquery: STRING                                      
-- proxy_uriextension: STRING                                      
-- proxy_serverip: STRING                                      
-- proxy_scbytes: INT                                         
-- proxy_csbytes: INT                                         
-- proxy_virusid: STRING                                      
-- proxy_bcappname: STRING                                      
-- proxy_bcappoper: STRING                                      
-- proxy_fulluri: STRING
+- p_date: STRING
+- p_time: STRING  
+- clientip: STRING                           
+- host: STRING    
+- reqmethod: STRING                                    
+- useragent: STRING                                      
+- resconttype: STRING                                      
+- duration: INT                                         
+- username: STRING                                      
+- authgroup: STRING                                      
+- exceptionid: STRING                                      
+- filterresult: STRING                                      
+- webcat: STRING                                      
+- referer: STRING                                      
+- respcode: STRING                                      
+- action: STRING                                      
+- urischeme: STRING                                      
+- uriport: STRING                                      
+- uripath: STRING                                      
+- uriquery: STRING                                      
+- uriextension: STRING                                      
+- serverip: STRING                                      
+- scbytes: INT                                         
+- csbytes: INT                                         
+- virusid: STRING                                      
+- bcappname: STRING                                      
+- bcappoper: STRING                                      
+- fulluri: STRING
 
 
 
@@ -148,11 +126,20 @@ As the maximum probability of an event is 1, a threshold of 1 can be used to sel
 
 ### oni-ml output
 
-Final results are stored in the following file on HDFS:
-`HPATH\scores\SOURCE_results.csv` 
+Final results are stored in the following file on HDFS.
+
+Depending on which data source is analyzed, 
+oni-ml output will be found under the ``HPATH`` at one of
+
+     $HPATH/dns/scored_results/YYYYMMDD/scores/dns_results.csv
+     $HPATH/proxy/scored_results/YYYYMMDD/scores/results.csv
+     $HPATH/flow/scored_results/YYYYMMDD/scores/flow_results.csv
+
+
 It is a csv file in which network events annotated with estimated probabilities and sorted in ascending order.
 
-A successful run of oni-ml will also create and populate a directory at `LPATH/YYYYMMDD` where `YYYYMMDD` is the date argument provided to `ml_ops.sh` 
+A successful run of oni-ml will also create and populate a directory at `LPATH/<source>/YYYYMMDD` where `<source>` is one of flow, dns or proxy, and
+`YYYYMMDD` is the date argument provided to `ml_ops.sh` 
 This directory will contain the following files generated during the LDA procedure used for topic-modelling:
 
 - model.dat An intermediate file in which each line corresponds to a "document" (the flow traffic about an IP, or the DNS queries of a client IP), and contains the size of the document and the list of "words" (simplified network events) occurring in the document with their frequencies. Words are encoded as integers per the file words.dat. 
@@ -161,7 +148,7 @@ This directory will contain the following files generated during the LDA procedu
 - final.other  Auxilliary information from the LDA run: Number of topics, number of terms, alpha.
 - likelihood.dat Convergence information for the LDA run.
 
-In addition, on each worker node identified in NODES, in the `LPATH/YYYYMMDD` directory files of the form `<worker index>.beta` and `<workder index>.gamma`, these are local temporary files that are combined to form `final.beta` and `final.gamma`, respectively.
+In addition, on each worker node identified in NODES, in the `LPATH/<source>/YYYYMMDD` directory files of the form `<worker index>.beta` and `<workder index>.gamma`, these are local temporary files that are combined to form `final.beta` and `final.gamma`, respectively.
 
 ## Licensing
 
