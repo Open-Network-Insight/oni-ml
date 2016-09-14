@@ -1,85 +1,74 @@
 package org.opennetworkinsight
 
 
+import javax.swing.text.Utilities
+
+import org.opennetworkinsight.dns.DNSWordCreation.DerivedFields
 import org.opennetworkinsight.dns.{DNSSuspiciousConnectsAnalysis, DNSWordCreation}
 import org.opennetworkinsight.testutils.TestingSparkContextFlatSpec
-import org.opennetworkinsight.utilities.{CountryCodes, Entropy}
+import org.opennetworkinsight.utilities.{CountryCodes, Entropy, TopDomains}
 import org.scalatest.Matchers
 
-class DNSWordCreationTest extends TestingSparkContextFlatSpec with Matchers{
+class DNSWordCreationTest extends TestingSparkContextFlatSpec with Matchers {
 
   val countryCodesSet = CountryCodes.CountryCodes
 
-  "extractSubdomain" should "return domain=None, subdomain= None, subdomain length= 0 and number of parts = 6" in {
+  "createDerivedFields" should "handle an in-addr.arpa url" in {
 
     val url = "123.103.104.10.in-addr.arpa"
     val countryCodes = sparkContext.broadcast(countryCodesSet)
+    val topDomains = sparkContext.broadcast(TopDomains.TOP_DOMAINS)
 
-    val result = DNSSuspiciousConnectsAnalysis.extractSubdomain(countryCodes, url)
+    // case class DerivedFields(topDomain: String, subdomainLength: Double, subdomainEntropy: Double, numPeriods: Double)
+    val result = DNSWordCreation.createDerivedFields(countryCodes, topDomains, url)
 
-    result.length shouldBe 4
-    result(0) shouldBe "None"
-    result(1) shouldBe "None"
-    result(2) shouldBe 0
-    result(3) shouldBe 6
+    result shouldBe DerivedFields(topDomainClass = 0, subdomainLength = 0, subdomainEntropy = 0, numPeriods = 6)
   }
 
-  it should "return domain=url index 'number of parts -3' , subdoamin=subset of url from index 0 to index 'number of parts" +
-    "- 3', subdomain length= subdomain.length" in {
+  it should "handle an Alexa top 1M domain with a subdomain, top-level domain name and country code" in {
 
     val url = "services.amazon.com.mx"
     val countryCodes = sparkContext.broadcast(countryCodesSet)
+    val topDomains = sparkContext.broadcast(TopDomains.TOP_DOMAINS)
 
-    val result = DNSSuspiciousConnectsAnalysis.extractSubdomain(countryCodes, url)
+    val result = DNSWordCreation.createDerivedFields(countryCodes, topDomains, url)
 
-    result.length shouldBe 4
-    result(0) shouldBe "amazon"
-    result(1) shouldBe "services"
-    result(2) shouldBe 8
-    result(3) shouldBe 4
+    result shouldBe DerivedFields(topDomainClass = 1, subdomainLength = 8, subdomainEntropy = 2.5, numPeriods = 4)
   }
 
-  it should "return domain=index 'number of parts -2' and subdomain=None, subdomain length=0" in {
+  it should "handle an Alexa top 1M domain with a top-level domain name and country code but no subdomain" in {
 
     val url = "amazon.com.mx"
     val countryCodes = sparkContext.broadcast(countryCodesSet)
+    val topDomains = sparkContext.broadcast(TopDomains.TOP_DOMAINS)
 
-    val result = DNSSuspiciousConnectsAnalysis.extractSubdomain(countryCodes, url)
+    val result = DNSWordCreation.createDerivedFields(countryCodes, topDomains, url)
 
-    result.length shouldBe 4
-    result(0) shouldBe "amazon"
-    result(1) shouldBe "None"
-    result(2) shouldBe 0
-    result(3) shouldBe 3
+    result shouldBe DerivedFields(topDomainClass = 1, subdomainLength = 0, subdomainEntropy = 0, numPeriods = 3)
   }
 
-  it should "return domain=index 'number of parts -2' and subdomain=subset of url parts from index 0 to index 'number " +
-    "of parts -2', subdomain length!=0" in {
+  it should "handle an Alexa top 1M domain with a subdomain and top-level domain name but no country code" in {
 
     val url = "services.amazon.com"
     val countryCodes = sparkContext.broadcast(countryCodesSet)
+    val topDomains = sparkContext.broadcast(TopDomains.TOP_DOMAINS)
 
-    val result = DNSSuspiciousConnectsAnalysis.extractSubdomain(countryCodes, url)
+    val result = DNSWordCreation.createDerivedFields(countryCodes, topDomains, url)
 
-    result.length shouldBe 4
-    result(0) shouldBe "amazon"
-    result(1) shouldBe "services"
-    result(2) shouldBe 8
-    result(3) shouldBe 3
+    result shouldBe DerivedFields(topDomainClass = 1, subdomainLength = 8, subdomainEntropy = 2.5, numPeriods = 3)
   }
 
-  "extractSubdomain" should "return domain=None, subdomain= None, subdomain length= 0 and number of parts = 2" in {
+  // this is the inherited behavior... but is it what we want? shouldn't this URL get an Alexa TopDomain class for
+  // having the domain "amazon" ???
+
+  it should "handle an Alexa top 1M domain with no subdomain or country code" in {
 
     val url = "amazon.com"
     val countryCodes = sparkContext.broadcast(countryCodesSet)
+    val topDomains = sparkContext.broadcast(TopDomains.TOP_DOMAINS)
+    val result = DNSWordCreation.createDerivedFields(countryCodes, topDomains, url)
 
-    val result = DNSSuspiciousConnectsAnalysis.extractSubdomain(countryCodes, url)
-
-    result.length shouldBe 4
-    result(0) shouldBe "None"
-    result(1) shouldBe "None"
-    result(2) shouldBe 0
-    result(3) shouldBe 2
+    result shouldBe DerivedFields(topDomainClass = 0, subdomainLength = 0, subdomainEntropy = 0, numPeriods = 2)
   }
 
 
@@ -90,4 +79,5 @@ class DNSWordCreationTest extends TestingSparkContextFlatSpec with Matchers{
 
     result shouldBe 2.807354922057604
   }
+
 }

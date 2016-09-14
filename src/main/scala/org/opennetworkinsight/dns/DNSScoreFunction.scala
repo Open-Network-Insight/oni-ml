@@ -1,23 +1,32 @@
 package org.opennetworkinsight.dns
+
 import org.apache.spark.broadcast.Broadcast
-import org.apache.spark.sql.functions._
+import org.opennetworkinsight.SuspiciousConnectsScoreFunction
 
-class DNSScoreFunction(topicCount: Int,
-                         ipToTopicMixBC: Broadcast[Map[String, Array[Double]]],
-                         wordToPerTopicProbBC: Broadcast[Map[String, Array[Double]]]) extends Serializable {
 
-  def score(ip: String, word: String): Double = {
+class DNSScoreFunction(frameLengthCuts: Array[Double],
+                       timeCuts: Array[Double],
+                       subdomainLengthCuts: Array[Double],
+                       entropyCuts: Array[Double],
+                       numberPeriodsCuts: Array[Double],
+                       topicCount: Int,
+                       ipToTopicMixBC: Broadcast[Map[String, Array[Double]]],
+                       wordToPerTopicProbBC: Broadcast[Map[String, Array[Double]]]) extends Serializable {
 
-    val uniformProb = Array.fill(topicCount) {
-      1.0d / topicCount
-    }
 
-    val topicGivenDocProbs = ipToTopicMixBC.value.getOrElse(ip, uniformProb)
-    val wordGivenTopicProbs = wordToPerTopicProbBC.value.getOrElse(word, uniformProb)
+  val suspiciousConnectsScoreFunction =
+    new SuspiciousConnectsScoreFunction(topicCount, ipToTopicMixBC, wordToPerTopicProbBC)
 
-    topicGivenDocProbs.zip(wordGivenTopicProbs)
-      .map({ case (pWordGivenTopic, pTopicGivenDoc) => pWordGivenTopic * pTopicGivenDoc })
-      .sum
+
+  def score(timeStamp: String,
+            unixTimeStamp: String,
+            frameLength: Int,
+            clientIP: String,
+            queryName: String,
+            queryClass: String,
+            queryType: String,
+            queryResponseCode: String) : Double = {
+
+0d
   }
-
 }

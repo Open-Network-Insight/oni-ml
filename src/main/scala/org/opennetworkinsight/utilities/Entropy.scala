@@ -14,11 +14,10 @@ object Entropy {
     * @return
     */
   def stringEntropy(v: String): Double = {
-    v
-      .groupBy(a => a)
-      .values
-      .map(i => i.length.toDouble / v.length)
-      .map(p => -p * log10(p) / log10(2))
-      .sum
+    if (v.length() > 0) {
+      v.groupBy(a => a).values.map(i => i.length.toDouble / v.length).map(p => -p * log10(p) / log10(2)).sum
+    } else {
+      0
+    }
   }
 }

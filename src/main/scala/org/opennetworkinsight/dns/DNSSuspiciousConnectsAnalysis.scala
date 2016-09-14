@@ -14,7 +14,8 @@ import org.opennetworkinsight.OniLDACWrapper
 import org.opennetworkinsight.OniLDACWrapper.OniLDACOutput
 import org.opennetworkinsight.SuspiciousConnectsArgumentParser.SuspiciousConnectsConfig
 import org.opennetworkinsight.dns.DNSSchema._
-import org.opennetworkinsight.utilities.CountryCodes
+import org.opennetworkinsight.proxy.ProxySchema.{ClientIP => _, Score => _, _}
+import org.opennetworkinsight.utilities.{CountryCodes, DataFrameUtils}
 import org.slf4j.Logger
 
 /**
@@ -43,80 +44,21 @@ object DNSSuspiciousConnectsAnalysis {
         QueryType,
         QueryResponseCode)
 
-    // add the derived fields
-
-    logger.info("Computing subdomain info")
-    val countryCodesBC = sparkContext.broadcast(CountryCodes.CountryCodes)
-
-    val queryNameIndex = rawDataDF.schema.fieldNames.indexOf(QueryName)
-
-    val dataWithSubdomainsRDD: RDD[Row] = rawDataDF.rdd.map(row =>
-      Row.fromSeq {row.toSeq ++ extractSubdomain(countryCodesBC, row.getString(queryNameIndex))})
-
-    // Update data frame schema with newly added columns. This happens b/c we are adding more than one column at once.
-    val schemaWithSubdomain = StructType(rawDataDF.schema.fields ++
-      refArrayOps(Array(StructField(Domain, StringType),
-          StructField(Subdomain, StringType),
-          StructField(SubdomainLength, DoubleType),
-          StructField(NumPeriods, DoubleType))))
 
 
-    val dataWithSubDomainsDF = sqlContext.createDataFrame(dataWithSubdomainsRDD, schemaWithSubdomain)
+    logger.info("Training the model")
+    val model =
+      DNSSuspiciousConnectsModel.trainNewModel(sparkContext, sqlContext, logger, config, rawDataDF, topicCount)
 
-    val docWordCount = DNSPreLDA.dnsPreLDA(config.inputPath, config.scoresFile, config.duplicationFactor, sparkContext, sqlContext, logger, dataWithSubDomainsDF)
+    logger.info("Scoring")
+    val scoredDF = model.score(sparkContext, sqlContext, rawDataDF)
 
-    val OniLDACOutput(documentResults, wordResults) = OniLDACWrapper.runLDA(docWordCount, config.modelFile, config.topicDocumentFile, config.topicWordFile,
-      config.mpiPreparationCmd, config.mpiCmd, config.mpiProcessCount, config.mpiTopicCount, config.localPath,
-      config.ldaPath, config.localUser, config.analysis, config.nodes)
+    // take the maxResults least probable events of probability below the threshold and sort
 
-    DNSPostLDA.dnsPostLDA(config.inputPath, config.hdfsScoredConnect, config.outputDelimiter, config.threshold, config.maxResults, topicCount, documentResults,
-      wordResults, sparkContext, sqlContext, logger)
+    val filteredDF = scoredDF.filter(Score +  " <= " + config.threshold)
+    val topRows = DataFrameUtils.dfTakeOrdered(filteredDF, "score", config.maxResults)
+    val scoreIndex = scoredDF.schema.fieldNames.indexOf("score")
+    val outputRDD = sparkContext.parallelize(topRows).sortBy(row => row.getDouble(scoreIndex))
     logger.info("DNS  suspcicious connects analysis completed.")
   }
-
-
-  def extractSubdomain(countryCodesBC: Broadcast[Set[String]], url: String): Array[Any] = {
-
-    val splitURL = url.split("[.]")
-    val numParts = splitURL.length
-    var domain = "None"
-    var subdomain = "None"
-
-    //first check if query is an Ip address e.g.: 123.103.104.10.in-addr.arpa or a name
-    val isIP = {
-      if (numParts > 2) {
-        if (splitURL(numParts - 1) == "arpa" & splitURL(numParts - 2) == "in-addr") {
-          "IP"
-        } else "Name"
-      } else "Unknown"
-    }
-
-    if (numParts > 2 && isIP != "IP") {
-      //This might try to parse things with only 1 or 2 numParts
-      //test if last element is a country code or tld
-      //use: Array(splitURL(numParts-1)).exists(country_codes contains _)
-      // don't use: country_codes.exists(splitURL(numParts-1).contains) this doesn't test exact match, might just match substring
-      if (Array(splitURL(numParts - 1)).exists(countryCodesBC.value contains _)) {
-        domain = splitURL(numParts - 3)
-        if (1 <= numParts - 3) {
-          subdomain = splitURL.slice(0, numParts - 3).mkString(".")
-        }
-      }
-      else {
-        domain = splitURL(numParts - 2)
-        subdomain = splitURL.slice(0, numParts - 2).mkString(".")
-      }
-    }
-
-    Array(domain, subdomain, {
-      if (subdomain != "None") {
-        subdomain.length.toDouble
-      } else {
-        0.0
-      }
-    }, numParts.toDouble)
-  }
 }
-
-
-

@@ -4,10 +4,10 @@ import org.apache.spark.SparkContext
 import org.apache.spark.broadcast.Broadcast
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.functions._
-import org.apache.spark.sql.types.{DoubleType, StringType, StructField, StructType}
+import org.apache.spark.sql.types._
 import org.apache.spark.sql.{DataFrame, Row, SQLContext}
-import org.opennetworkinsight.dns.{DNSSchema => Schema}
-import org.opennetworkinsight.utilities.{CountryCodes, Entropy, Quantiles}
+import org.opennetworkinsight.dns.DNSSchema._
+import org.opennetworkinsight.utilities.{CountryCodes, Entropy, Quantiles, TopDomains}
 import org.slf4j.Logger
 
 import scala.io.Source
@@ -16,151 +16,171 @@ import scala.io.Source
 
 
 
-    def dnsWordCreation(inDF: DataFrame,
-                        sc: SparkContext, logger: Logger, sqlContext: SQLContext): DataFrame ={
-
-      var timeCuts = new Array[Double](10)
-      var frameLengthCuts = new Array[Double](10)
-      var subdomainLengthCuts = new Array[Double](5)
-      var numberPeriodsCuts = new Array[Double](5)
-      var entropyCuts = new Array[Double](5)
-
-      val topDomains = sc.broadcast(Source.fromFile("top-1m.csv").getLines.map(line => {
-        val parts = line.split(",")
-        parts(1).split("[.]")(0)
-      }).toSet)
+    def addDerivedFields(sparkContext: SparkContext, sqlContext: SQLContext, countryCodesBC: Broadcast[Set[String]],
+                         topDomainsBC: Broadcast[Set[String]], inDF: DataFrame) : DataFrame = {
 
 
+      val queryNameIndex = inDF.schema.fieldNames.indexOf(QueryName)
 
-      logger.info("Computing subdomain entropy")
+      val schemaWithAddedFields = StructType(inDF.schema.fields ++
+        refArrayOps(Array(StructField(TopDomain, StringType),
+          StructField(Subdomain, StringType),
+          StructField(SubdomainLength, DoubleType),
+          StructField(NumPeriods, DoubleType))))
 
-      val udfStringEntropy = DNSWordCreation.udfStringEntropy()
+      val dataWithSubdomainsRDD: RDD[Row] = inDF.rdd.map(row =>
+        Row.fromSeq {row.toSeq ++
+          derivedFieldsToArray(createDerivedFields(countryCodesBC, topDomainsBC, row.getString(queryNameIndex)))})
 
-      val dataWithSubdomainEntropyDF = inDF.withColumn(Schema.SubdomainEntropy,
-        udfStringEntropy(col(Schema.Subdomain)))
+      // Update data frame schema with newly added columns. This happens b/c we are adding more than one column at once.
 
-      logger.info("Calculating time cuts ...")
-
-      timeCuts = Quantiles.computeDeciles(dataWithSubdomainEntropyDF
-        .select(Schema.UnixTimestamp)
-        .rdd
-        .map({ case Row(unixTimeStamp: Long) => unixTimeStamp.toDouble }))
-
-      logger.info(timeCuts.mkString(","))
-
-      logger.info("Calculating frame length cuts ...")
-
-      frameLengthCuts = Quantiles.computeDeciles(dataWithSubdomainEntropyDF
-        .select(Schema.FrameLength)
-        .rdd
-        .map({ case Row(frameLen: Int) => frameLen.toDouble }))
-
-      logger.info(frameLengthCuts.mkString(","))
-
-      logger.info("Calculating subdomain length cuts ...")
-
-      subdomainLengthCuts = Quantiles.computeQuintiles(dataWithSubdomainEntropyDF
-        .filter(Schema.SubdomainLength +  " > 0")
-        .select(Schema.SubdomainLength)
-        .rdd
-        .map({ case Row(subdomainLength: Double) => subdomainLength }))
-
-      logger.info(subdomainLengthCuts.mkString(","))
-
-      logger.info("Calculating entropy cuts")
-
-      entropyCuts = Quantiles.computeQuintiles(dataWithSubdomainEntropyDF
-        .filter(Schema.SubdomainEntropy + " > 0")
-        .select(Schema.SubdomainEntropy)
-        .rdd
-        .map({ case Row(subdomainEntropy: Double) => subdomainEntropy }))
-
-      logger.info(entropyCuts.mkString(","))
-
-      logger.info("Calculating num periods cuts ...")
-
-      numberPeriodsCuts = Quantiles.computeQuintiles(dataWithSubdomainEntropyDF
-        .filter(Schema.NumPeriods + " > 0")
-        .select(Schema.NumPeriods)
-        .rdd
-        .map({ case Row(numberPeriods: Double) => numberPeriods }))
-
-      logger.info(numberPeriodsCuts.mkString(","))
-
-      val udfGetTopDomain = DNSWordCreation.udfGetTopDomain(topDomains)
-
-      val dataWithTopDomainDF = dataWithSubdomainEntropyDF.withColumn(Schema.TopDomain,
-        udfGetTopDomain(dataWithSubdomainEntropyDF(Schema.Domain)))
-
-      logger.info("Adding words")
-
-      val udfWordCreation = DNSWordCreation.udfWordCreation(frameLengthCuts, timeCuts,
-        subdomainLengthCuts, entropyCuts, numberPeriodsCuts)
-
-      val dataWithWordDF = dataWithTopDomainDF.withColumn(Schema.Word, udfWordCreation(
-        dataWithTopDomainDF(Schema.TopDomain),
-        dataWithTopDomainDF(Schema.FrameLength),
-        dataWithTopDomainDF(Schema.UnixTimestamp),
-        dataWithTopDomainDF(Schema.SubdomainLength),
-        dataWithTopDomainDF(Schema.SubdomainEntropy),
-        dataWithTopDomainDF(Schema.NumPeriods),
-        dataWithTopDomainDF(Schema.QueryType),
-        dataWithTopDomainDF(Schema.QueryResponseCode)))
-
-      dataWithWordDF
+      sqlContext.createDataFrame(dataWithSubdomainsRDD, schemaWithAddedFields)
     }
 
-    def udfGetTopDomain(topDomains: Broadcast[Set[String]]) = udf((domain: String) => getTopDomain(topDomains, domain))
 
-    def getTopDomain(topDomains: Broadcast[Set[String]], domain: String) = {
+    case class DerivedFields(topDomainClass: Int, subdomainLength: Double, subdomainEntropy: Double, numPeriods: Double)
+
+    def derivedFieldsToArray(df: DerivedFields) =
+      Array(df.topDomainClass, df.subdomainLength, df.subdomainEntropy, df.numPeriods)
+
+    def createDerivedFields(countryCodesBC: Broadcast[Set[String]],
+                            topDomains: Broadcast[Set[String]],
+                            url: String) : DerivedFields = {
+
+      val SubdomainInfo(domain, subdomain, subdomainLength, numPeriods) = extractSubomain(countryCodesBC, url)
+
+      val topDomainClass = getTopDomain(topDomains: Broadcast[Set[String]], domain: String)
+      val subdomainEntropy = if (subdomain != "None") Entropy.stringEntropy(subdomain) else 0d
+
+      DerivedFields(topDomainClass= topDomainClass,
+        subdomainLength= subdomainLength,
+        subdomainEntropy= subdomainEntropy,
+        numPeriods= numPeriods)
+    }
+
+
+    def getTopDomain(topDomains: Broadcast[Set[String]], domain: String) : Int = {
       if (domain == "intel") {
-        "2"
+        2
       } else if (topDomains.value contains domain) {
-        "1"
-      } else "0"
+        1
+      } else {
+        0
+      }
     }
-
-
-
-    def udfStringEntropy() = udf((subdomain: String) => Entropy.stringEntropy(subdomain))
 
     def udfWordCreation(frameLengthCuts: Array[Double],
                         timeCuts: Array[Double],
                         subdomainLengthCuts: Array[Double],
                         entropyCuts: Array[Double],
-                        numberPeriodsCuts: Array[Double]) =
-      udf((topDomain: String,
+                        numberPeriodsCuts: Array[Double],
+                        countryCodesBC: Broadcast[Set[String]],
+                        topDomainsBC: Broadcast[Set[String]]) =
+      udf((timeStamp: String,
+           unixTimeStamp: String,
            frameLength: Int,
-           unixTimeStamp: Long,
-           subdomainLength: Double,
-           subdomainEntropy: Double,
-           numberPeriods: Double,
-           dnsQueryType: Int,
-           dnsQueryRcode: Int) => dnsWord(topDomain, frameLength, unixTimeStamp, subdomainLength, subdomainEntropy,
-        numberPeriods, dnsQueryType, dnsQueryRcode, frameLengthCuts, timeCuts, subdomainLengthCuts, entropyCuts, numberPeriodsCuts))
+           clientIP: String,
+           queryName: String,
+           queryClass: String,
+           dnsQueryType: String,
+           dnsQueryRcode: String) => dnsWord(timeStamp,
+        unixTimeStamp,
+        frameLength,
+        clientIP,
+        queryName,
+        queryClass,
+        dnsQueryType,
+        dnsQueryRcode,
+        frameLengthCuts,
+        timeCuts,
+        subdomainLengthCuts,
+        entropyCuts,
+        numberPeriodsCuts,
+        countryCodesBC,
+        topDomainsBC))
 
-    def dnsWord(topDomain: String,
-                frameLength: Int,
-                unixTimeStamp: Long,
-                subdomainLength: Double,
-                subdomainEntropy: Double,
-                numberPeriods: Double,
-                dnsQueryType: Int,
-                dnsQueryRcode: Int,
+
+    def dnsWord(timeStamp: String,
+                 unixTimeStamp: String,
+                 frameLength: Int,
+                 clientIP: String,
+                 queryName: String,
+                 queryClass: String,
+                 dnsQueryType: String,
+                 dnsQueryRcode: String,
                 frameLengthCuts: Array[Double],
                 timeCuts: Array[Double],
                 subdomainLengthCuts: Array[Double],
                 entropyCuts: Array[Double],
-                numberPeriodsCuts: Array[Double]): String = {
-      Seq(topDomain ,
+                numberPeriodsCuts: Array[Double],
+               countryCodesBC: Broadcast[Set[String]],
+                topDomainsBC: Broadcast[Set[String]]): String = {
+
+
+
+      val DerivedFields(topDomain, subdomainLength, subdomainEntropy, numPeriods) =
+        createDerivedFields(countryCodesBC, topDomainsBC, queryName)
+
+
+
+      Seq(topDomain,
         Quantiles.bin(frameLength.toDouble, frameLengthCuts) ,
         Quantiles.bin(unixTimeStamp.toDouble, timeCuts) ,
         Quantiles.bin(subdomainLength, subdomainLengthCuts) ,
         Quantiles.bin(subdomainEntropy, entropyCuts) ,
-        Quantiles.bin(numberPeriods, numberPeriodsCuts) ,
+        Quantiles.bin(numPeriods, numberPeriodsCuts) ,
         dnsQueryType ,
         dnsQueryRcode).mkString("_")
     }
+
+
+
+
+    case class SubdomainInfo(domain: String, subdomain: String, subdomainLength: Double, numPeriods: Double)
+    def extractSubomain(countryCodesBC: Broadcast[Set[String]], url: String): SubdomainInfo = {
+
+      val splitURL = url.split("[.]")
+      val numParts = splitURL.length
+      var domain = "None"
+      var subdomain = "None"
+
+      //first check if query is an Ip address e.g.: 123.103.104.10.in-addr.arpa or a name
+      val isIP = {
+        if (numParts > 2) {
+          if (splitURL(numParts - 1) == "arpa" & splitURL(numParts - 2) == "in-addr") {
+            "IP"
+          } else "Name"
+        } else "Unknown"
+      }
+
+      if (numParts > 2 && isIP != "IP") {
+        //This might try to parse things with only 1 or 2 numParts
+        //test if last element is a country code or tld
+        //use: Array(splitURL(numParts-1)).exists(country_codes contains _)
+        // don't use: country_codes.exists(splitURL(numParts-1).contains) this doesn't test exact match, might just match substring
+        if (Array(splitURL(numParts - 1)).exists(countryCodesBC.value contains _)) {
+          domain = splitURL(numParts - 3)
+          if (1 <= numParts - 3) {
+            subdomain = splitURL.slice(0, numParts - 3).mkString(".")
+          }
+        }
+        else {
+          domain = splitURL(numParts - 2)
+          subdomain = splitURL.slice(0, numParts - 2).mkString(".")
+        }
+      }
+
+
+      val subdomainLength = if (subdomain != "None") {
+        subdomain.length.toDouble
+      } else {
+        0.0
+      }
+      SubdomainInfo(domain, subdomain, subdomainLength, numParts.toDouble)
+    }
+
+
+
   }
 
 
