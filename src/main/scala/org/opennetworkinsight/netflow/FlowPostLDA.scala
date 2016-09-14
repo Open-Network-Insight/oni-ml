@@ -65,14 +65,14 @@ object FlowPostLDA {
 
     logger.info("Computing conditional probability")
 
-    val docToTopicMixesRDD: RDD[(String, Array[Double])] = sc.parallelize(docToTopicMix.toSeq)
+    val docToTopicMixRDD: RDD[(String, Array[Double])] = sc.parallelize(docToTopicMix.toSeq)
 
-    val ipToTopicMixesDF = docToTopicMixesRDD.map({ case (doc, probabilities) => DocTopicMixes(doc, probabilities) }).toDF
+    val docToTopicMixDF = docToTopicMixRDD.map({ case (doc, probabilities) => DocTopicMix(doc, probabilities) }).toDF
 
     val words = sc.broadcast(wordToProbPerTopic)
 
-    val dataWithSrcScore = score(sc, dataWithWord, ipToTopicMixesDF, words, SourceScore, SourceIP, SourceProbabilities, SourceWord)
-    val dataWithDestScore = score(sc, dataWithSrcScore, ipToTopicMixesDF, words, DestinationScore, DestinationIP, DestinationProbabilities, DestinationWord)
+    val dataWithSrcScore = score(sc, dataWithWord, docToTopicMixDF, words, SourceScore, SourceIP, SourceProbabilities, SourceWord)
+    val dataWithDestScore = score(sc, dataWithSrcScore, docToTopicMixDF, words, DestinationScore, DestinationIP, DestinationProbabilities, DestinationWord)
     val dataScored = minimumScore(dataWithDestScore)
 
     logger.info("Persisting data")
@@ -84,14 +84,14 @@ object FlowPostLDA {
 
   def score(sc: SparkContext,
             dataFrame: DataFrame,
-            ipToTopicMixesDF: DataFrame,
+            docToTopicMixesDF: DataFrame,
             words: Broadcast[Map[String, Array[Double]]],
             newColumnName: String,
             ipColumnName: String,
             ipProbabilitiesColumnName: String,
             wordColumnName: String): DataFrame = {
 
-    val dataWithIpProbJoin = dataFrame.join(ipToTopicMixesDF, dataFrame(ipColumnName) === ipToTopicMixesDF(Doc))
+    val dataWithIpProbJoin = dataFrame.join(docToTopicMixesDF, dataFrame(ipColumnName) === docToTopicMixesDF(Doc))
 
     var newSchemaColumns = dataFrame.schema.fieldNames :+ Probabilities + " as " + ipProbabilitiesColumnName
     val dataWithIpProb = dataWithIpProbJoin.selectExpr(newSchemaColumns: _*)
@@ -125,5 +125,5 @@ object FlowPostLDA {
       udfMinimumScoreFunction(dataWithDestScore(SourceScore), dataWithDestScore(DestinationScore)))
   }
 
-  case class DocTopicMixes(doc: String, probabilities: Array[Double]) extends Serializable
+  case class DocTopicMix(doc: String, probabilities: Array[Double]) extends Serializable
 }
