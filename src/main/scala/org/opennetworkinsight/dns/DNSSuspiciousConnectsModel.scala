@@ -19,7 +19,7 @@ class DNSSuspiciousConnectsModel(topicCount: Int,
                                  timeCuts: Array[Double],
                                  frameLengthCuts: Array[Double],
                                  subdomainLengthCuts: Array[Double],
-                                 numberPeriodsCuts:  Array[Double],
+                                 numberPeriodsCuts: Array[Double],
                                  entropyCuts: Array[Double]) {
 
 
@@ -28,42 +28,61 @@ class DNSSuspiciousConnectsModel(topicCount: Int,
     val countryCodesBC = sc.broadcast(CountryCodes.CountryCodes)
     val topDomainsBC = sc.broadcast(TopDomains.TOP_DOMAINS)
 
-    val df = DNSWordCreation.addDerivedFields(sc, sqlContext,  countryCodesBC, topDomainsBC, inDF)
-
     val udfWordCreation = DNSWordCreation.udfWordCreation(frameLengthCuts,
-        timeCuts,
-        subdomainLengthCuts,
-        entropyCuts,
-        numberPeriodsCuts,
+      timeCuts,
+      subdomainLengthCuts,
+      entropyCuts,
+      numberPeriodsCuts,
       countryCodesBC,
       topDomainsBC)
-
-    val wordedDataFrame = df.withColumn(Word, udfWordCreation(
-      df(TopDomain),
-      df(FrameLength),
-      df(UnixTimestamp),
-      df(SubdomainLength),
-      df(SubdomainEntropy),
-      df(NumPeriods),
-      df(QueryType),
-      df(QueryResponseCode)))
 
 
     val ipToTopicMixBC = sc.broadcast(ipToTopicMix)
     val wordToPerTopicProbBC = sc.broadcast(wordToPerTopicProb)
 
+    val scoreFunction = new DNSScoreFunction(frameLengthCuts,
+      timeCuts,
+      subdomainLengthCuts,
+      entropyCuts,
+      numberPeriodsCuts,
+      topicCount,
+      ipToTopicMixBC,
+      wordToPerTopicProbBC,
+      countryCodesBC,
+      topDomainsBC)
 
-    val scoreFunction = new SuspiciousConnectsScoreFunction(topicCount, ipToTopicMixBC, wordToPerTopicProbBC)
 
+    def udfScoreFunction = udf((timeStamp: String,
+                                unixTimeStamp: Long,
+                                frameLength: Int,
+                                clientIP: String,
+                                queryName: String,
+                                queryClass: String,
+                                queryType: Int,
+                                queryResponseCode: Int) =>
+      scoreFunction.score(timeStamp: String,
+        unixTimeStamp: Long,
+        frameLength: Int,
+        clientIP: String,
+        queryName: String,
+        queryClass: String,
+        queryType: Int,
+        queryResponseCode: Int))
 
-    def udfScoreFunction = udf((ip: String, word: String) => scoreFunction.score(ip, word))
-    wordedDataFrame.withColumn(Score, udfScoreFunction(wordedDataFrame(ClientIP), wordedDataFrame(Word)))
+    inDF.withColumn(Score, udfScoreFunction(inDF(Timestamp),
+      inDF(UnixTimestamp),
+      inDF(FrameLength),
+      inDF(ClientIP),
+      inDF(QueryName),
+      inDF(QueryClass),
+      inDF(QueryType),
+      inDF(QueryResponseCode)))
   }
 }
 
 object DNSSuspiciousConnectsModel {
 
-  def  trainNewModel(sparkContext: SparkContext,
+  def trainNewModel(sparkContext: SparkContext,
                     sqlContext: SQLContext,
                     logger: Logger,
                     config: SuspiciousConnectsConfig,
@@ -73,9 +92,9 @@ object DNSSuspiciousConnectsModel {
     logger.info("DNS pre LDA starts")
 
 
-
     print("Read source data")
     logger.info("Read source data")
+
     val selectedDF = inDF.select(Timestamp,
       UnixTimestamp,
       FrameLength,
@@ -112,7 +131,7 @@ object DNSSuspiciousConnectsModel {
 
 
     val subdomainLengthCuts = Quantiles.computeQuintiles(df
-      .filter(SubdomainLength +  " > 0")
+      .filter(SubdomainLength + " > 0")
       .select(SubdomainLength)
       .rdd
       .map({ case Row(subdomainLength: Double) => subdomainLength }))
@@ -130,35 +149,29 @@ object DNSSuspiciousConnectsModel {
       .rdd
       .map({ case Row(numberPeriods: Double) => numberPeriods }))
 
-
-
     val udfWordCreation = DNSWordCreation.udfWordCreation(frameLengthCuts, timeCuts,
       subdomainLengthCuts, entropyCuts, numberPeriodsCuts, countryCodesBC,
       topDomainsBC)
 
     val dataWithWordDF = df.withColumn(Word, udfWordCreation(
-      df(TopDomain),
-      df(FrameLength),
+      df(Timestamp),
       df(UnixTimestamp),
-      df(SubdomainLength),
-      df(SubdomainEntropy),
-      df(NumPeriods),
+      df(FrameLength),
+      df(ClientIP),
+      df(QueryName),
+      df(QueryClass),
       df(QueryType),
       df(QueryResponseCode)))
 
-    val ipDstWordCounts = dataWithWordDF
-      .select(ClientIP, Word)
-      .map({
-        case Row(destIP: String, word: String) =>
-          (destIP, word) -> 1
-      })
-      .reduceByKey(_ + _)
-      .map({case ((ipDst, word), count) => OniLDACInput(ipDst, word, count)})
+    val ipDstWordCounts =
+      dataWithWordDF.select(ClientIP, Word).map({ case Row(destIP: String, word: String) => (destIP, word) -> 1 })
+        .reduceByKey(_ + _)
+        .map({ case ((ipDst, word), count) => OniLDACInput(ipDst, word, count) })
 
     val OniLDACOutput(ipToTopicMix, wordToPerTopicProb) =
-    OniLDACWrapper.runLDA(ipDstWordCounts, config.modelFile, config.topicDocumentFile, config.topicWordFile,
-      config.mpiPreparationCmd, config.mpiCmd, config.mpiProcessCount, config.mpiTopicCount, config.localPath,
-      config.ldaPath, config.localUser, config.analysis, config.nodes)
+      OniLDACWrapper.runLDA(ipDstWordCounts, config.modelFile, config.topicDocumentFile, config.topicWordFile,
+        config.mpiPreparationCmd, config.mpiCmd, config.mpiProcessCount, config.mpiTopicCount, config.localPath,
+        config.ldaPath, config.localUser, config.analysis, config.nodes)
 
     new DNSSuspiciousConnectsModel(topicCount,
       ipToTopicMix,

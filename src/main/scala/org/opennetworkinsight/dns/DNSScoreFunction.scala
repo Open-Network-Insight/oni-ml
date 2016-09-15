@@ -11,7 +11,9 @@ class DNSScoreFunction(frameLengthCuts: Array[Double],
                        numberPeriodsCuts: Array[Double],
                        topicCount: Int,
                        ipToTopicMixBC: Broadcast[Map[String, Array[Double]]],
-                       wordToPerTopicProbBC: Broadcast[Map[String, Array[Double]]]) extends Serializable {
+                       wordToPerTopicProbBC: Broadcast[Map[String, Array[Double]]],
+                       countryCodesBC: Broadcast[Set[String]],
+                       topDomainsBC: Broadcast[Set[String]]) extends Serializable {
 
 
   val suspiciousConnectsScoreFunction =
@@ -19,14 +21,30 @@ class DNSScoreFunction(frameLengthCuts: Array[Double],
 
 
   def score(timeStamp: String,
-            unixTimeStamp: String,
+            unixTimeStamp: Long,
             frameLength: Int,
             clientIP: String,
             queryName: String,
             queryClass: String,
-            queryType: String,
-            queryResponseCode: String) : Double = {
+            queryType: Int,
+            queryResponseCode: Int) : Double = {
 
-0d
+    val word = DNSWordCreation.dnsWord(timeStamp,
+      unixTimeStamp,
+      frameLength,
+      clientIP,
+      queryName,
+      queryClass,
+      queryType,
+      queryResponseCode,
+      frameLengthCuts,
+      timeCuts,
+      subdomainLengthCuts,
+      entropyCuts,
+      numberPeriodsCuts,
+      countryCodesBC,
+      topDomainsBC)
+
+    suspiciousConnectsScoreFunction.score(clientIP,word)
   }
 }

@@ -1,4 +1,8 @@
 package org.opennetworkinsight.dns
+
+import org.apache.spark.sql.{Column, DataFrame}
+import org.apache.spark.sql.functions._
+
 /**
   * Data frame column names used in the DNS suspicious connects analysis.
   */
@@ -31,4 +35,19 @@ object DNSSchema {
 
   val Word = "word"
   val Score = "score"
+
+
+
+  val ModelFields = Seq(Timestamp,
+    UnixTimestamp,
+    FrameLength,
+    ClientIP,
+    QueryName,
+    QueryClass,
+    QueryType,
+    QueryResponseCode)
+
+  val ModelColumns = ModelFields.map(col)
+
+  def modelColumns(df: DataFrame) : Seq[Column]  = ModelFields.map(df(_))
 }

@@ -2,12 +2,13 @@ package org.opennetworkinsight.dns
 
 import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
-import org.apache.spark.sql.types.{StringType, StructField, StructType}
+import org.apache.spark.sql.types._
 import org.apache.spark.sql.{DataFrame, Row, SQLContext}
 import org.opennetworkinsight.dns.DNSSchema._
+
 import scala.io.Source
 
-
+import org.apache.spark.sql.functions._
 object DNSFeedback {
 
   /**
@@ -28,13 +29,13 @@ object DNSFeedback {
 
     val feedbackSchema = StructType(
       List(StructField(Timestamp, StringType, nullable= true),
-        StructField(UnixTimestamp, StringType, nullable= true),
-        StructField(FrameLength, StringType, nullable= true),
+        StructField(UnixTimestamp, LongType, nullable= true),
+        StructField(FrameLength, IntegerType, nullable= true),
         StructField(ClientIP, StringType, nullable= true),
         StructField(QueryName, StringType, nullable= true),
         StructField(QueryClass, StringType, nullable= true),
-        StructField(QueryType, StringType, nullable= true),
-        StructField(QueryResponseCode, StringType, nullable= true)))
+        StructField(QueryType, IntegerType, nullable= true),
+        StructField(QueryResponseCode, IntegerType, nullable= true)))
 
     if (new java.io.File(feedbackFile).exists) {
 
@@ -90,14 +91,7 @@ object DNSFeedback {
           row(DnsQryTypeIndex),
           row(DnsQryRcodeIndex))))
         .flatMap(row => List.fill(duplicationFactor)(row)), feedbackSchema)
-        .select(Timestamp,
-          UnixTimestamp,
-          FrameLength,
-          ClientIP,
-          QueryName,
-          QueryClass,
-          QueryType,
-          QueryResponseCode)
+        .select(ModelColumns:_*)
     } else {
       sqlContext.createDataFrame(sc.emptyRDD[Row], feedbackSchema)
     }

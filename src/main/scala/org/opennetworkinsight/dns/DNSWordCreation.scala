@@ -16,16 +16,19 @@ import scala.io.Source
 
 
 
-    def addDerivedFields(sparkContext: SparkContext, sqlContext: SQLContext, countryCodesBC: Broadcast[Set[String]],
-                         topDomainsBC: Broadcast[Set[String]], inDF: DataFrame) : DataFrame = {
+    def addDerivedFields(sparkContext: SparkContext,
+                         sqlContext: SQLContext,
+                         countryCodesBC: Broadcast[Set[String]],
+                         topDomainsBC: Broadcast[Set[String]],
+                         inDF: DataFrame) : DataFrame = {
 
 
       val queryNameIndex = inDF.schema.fieldNames.indexOf(QueryName)
 
       val schemaWithAddedFields = StructType(inDF.schema.fields ++
-        refArrayOps(Array(StructField(TopDomain, StringType),
-          StructField(Subdomain, StringType),
+        refArrayOps(Array(StructField(TopDomain, IntegerType),
           StructField(SubdomainLength, DoubleType),
+          StructField(SubdomainEntropy, DoubleType),
           StructField(NumPeriods, DoubleType))))
 
       val dataWithSubdomainsRDD: RDD[Row] = inDF.rdd.map(row =>
@@ -77,13 +80,13 @@ import scala.io.Source
                         countryCodesBC: Broadcast[Set[String]],
                         topDomainsBC: Broadcast[Set[String]]) =
       udf((timeStamp: String,
-           unixTimeStamp: String,
+           unixTimeStamp: Long,
            frameLength: Int,
            clientIP: String,
            queryName: String,
            queryClass: String,
-           dnsQueryType: String,
-           dnsQueryRcode: String) => dnsWord(timeStamp,
+           dnsQueryType: Int,
+           dnsQueryRcode: Int) => dnsWord(timeStamp,
         unixTimeStamp,
         frameLength,
         clientIP,
@@ -101,13 +104,13 @@ import scala.io.Source
 
 
     def dnsWord(timeStamp: String,
-                 unixTimeStamp: String,
+                 unixTimeStamp: Long,
                  frameLength: Int,
                  clientIP: String,
                  queryName: String,
                  queryClass: String,
-                 dnsQueryType: String,
-                 dnsQueryRcode: String,
+                 dnsQueryType: Int,
+                 dnsQueryRcode: Int,
                 frameLengthCuts: Array[Double],
                 timeCuts: Array[Double],
                 subdomainLengthCuts: Array[Double],
@@ -139,10 +142,11 @@ import scala.io.Source
     case class SubdomainInfo(domain: String, subdomain: String, subdomainLength: Double, numPeriods: Double)
     def extractSubomain(countryCodesBC: Broadcast[Set[String]], url: String): SubdomainInfo = {
 
+      val None = "None"
       val splitURL = url.split("[.]")
       val numParts = splitURL.length
-      var domain = "None"
-      var subdomain = "None"
+      var domain = None
+      var subdomain = None
 
       //first check if query is an Ip address e.g.: 123.103.104.10.in-addr.arpa or a name
       val isIP = {
@@ -171,7 +175,7 @@ import scala.io.Source
       }
 
 
-      val subdomainLength = if (subdomain != "None") {
+      val subdomainLength = if (subdomain != None) {
         subdomain.length.toDouble
       } else {
         0.0

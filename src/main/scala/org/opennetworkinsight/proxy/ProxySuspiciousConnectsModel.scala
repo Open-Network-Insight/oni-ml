@@ -29,7 +29,6 @@ class ProxySuspiciousConnectsModel(topicCount: Int,
                                    entropyCuts: Array[Double],
                                    agentCuts: Array[Double]) {
 
-
   /**
     * Calculate suspicious connection scores for an incoming dataframe using this proxy suspicious connects model.
     *
@@ -117,7 +116,8 @@ object ProxySuspiciousConnectsModel {
     val agentCuts =
       Quantiles.computeQuintiles(df.select(UserAgent).rdd.map({ case Row(agent: String) => agentToCountBC.value(agent) }))
 
-    val docWordCount: RDD[OniLDACInput] = getIPWordCounts(sparkContext, sqlContext, logger, df, config.scoresFile, config.duplicationFactor, agentToCount, timeCuts, entropyCuts, agentCuts)
+    val docWordCount: RDD[OniLDACInput] =
+      getIPWordCounts(sparkContext, sqlContext, logger, df, config.scoresFile, config.duplicationFactor, agentToCount, timeCuts, entropyCuts, agentCuts)
 
 
     val OniLDACOutput(documentResults, wordResults) = OniLDACWrapper.runLDA(docWordCount,

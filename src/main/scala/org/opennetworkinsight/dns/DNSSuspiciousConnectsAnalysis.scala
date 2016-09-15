@@ -60,5 +60,8 @@ object DNSSuspiciousConnectsAnalysis {
     val scoreIndex = scoredDF.schema.fieldNames.indexOf("score")
     val outputRDD = sparkContext.parallelize(topRows).sortBy(row => row.getDouble(scoreIndex))
     logger.info("DNS  suspcicious connects analysis completed.")
+
+    println("Saving results to : " + config.hdfsScoredConnect)
+    outputRDD.map(_.mkString(config.outputDelimiter)).saveAsTextFile(config.hdfsScoredConnect)
   }
 }
