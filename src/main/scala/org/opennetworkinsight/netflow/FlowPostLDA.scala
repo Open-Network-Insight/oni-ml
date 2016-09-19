@@ -76,7 +76,7 @@ object FlowPostLDA {
     val dataScored = minimumScore(dataWithDestScore)
 
     logger.info("Persisting data")
-    val filteredDF = dataScored.filter(MinimumScore + " < " + threshold)
+    val filteredDF = dataScored.filter(MinimumScore + " <= " + threshold)
     filteredDF.orderBy(MinimumScore).limit(topK).rdd.map(row => Row.fromSeq(row.toSeq.dropRight(1))).map(_.mkString(outputDelimiter)).saveAsTextFile(resultsFilePath)
 
     logger.info("Flow post LDA completed")
@@ -85,8 +85,8 @@ object FlowPostLDA {
   def score(sc: SparkContext,
             dataFrame: DataFrame,
             docToTopicMixesDF: DataFrame,
-            words: Broadcast[Map[String, Array[Double]]],
-            newColumnName: String,
+            wordToProbPerTopic: Broadcast[Map[String, Array[Double]]],
+            scoreColumnName: String,
             ipColumnName: String,
             ipProbabilitiesColumnName: String,
             wordColumnName: String): DataFrame = {
@@ -98,7 +98,7 @@ object FlowPostLDA {
 
     def scoreFunction(word: String, ipProbabilities: Seq[Double]): Double = {
       val uniformProb = Array.fill(20)(0.05d)
-      val wordGivenTopicProb = words.value.getOrElse(word, uniformProb)
+      val wordGivenTopicProb = wordToProbPerTopic.value.getOrElse(word, uniformProb)
 
       ipProbabilities.zip(wordGivenTopicProb)
         .map({ case (pWordGivenTopic, pTopicGivenDoc) => pWordGivenTopic * pTopicGivenDoc })
@@ -107,8 +107,8 @@ object FlowPostLDA {
 
     def udfScoreFunction = udf((word: String, ipProbabilities: Seq[Double]) => scoreFunction(word, ipProbabilities))
 
-    val result: DataFrame = dataWithIpProb.withColumn(newColumnName, udfScoreFunction(dataWithIpProb(wordColumnName), dataWithIpProb(ipProbabilitiesColumnName)))
-    newSchemaColumns = dataFrame.schema.fieldNames :+ newColumnName
+    val result: DataFrame = dataWithIpProb.withColumn(scoreColumnName, udfScoreFunction(dataWithIpProb(wordColumnName), dataWithIpProb(ipProbabilitiesColumnName)))
+    newSchemaColumns = dataFrame.schema.fieldNames :+ scoreColumnName
     result.select(newSchemaColumns.map(col): _*)
   }
 
