@@ -46,7 +46,7 @@ object DNSPostLDA {
 
     logger.info("Persisting data")
 
-    val filteredDF = dataScored.filter(Score + " < " + threshold)
+    val filteredDF = dataScored.filter(Score + " <= " + threshold)
 
     val count = filteredDF.count
 
