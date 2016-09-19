@@ -15,6 +15,27 @@ import scala.io.Source
   object DNSWordCreation {
 
 
+    def addOAFields(sparkContext: SparkContext,
+                    sqlContext: SQLContext,
+                    countryCodesBC: Broadcast[Set[String]],
+                    topDomainsBC: Broadcast[Set[String]],
+                    inDF: DataFrame) : DataFrame = {
+      val queryNameIndex = inDF.schema.fieldNames.indexOf(QueryName)
+
+      val schemaWithAddedFields = StructType(inDF.schema.fields ++
+        refArrayOps(Array(StructField(TopDomain, IntegerType),
+          StructField(SubdomainLength, DoubleType),
+          StructField(SubdomainEntropy, DoubleType),
+          StructField(NumPeriods, DoubleType))))
+
+      val dataWithSubdomainsRDD: RDD[Row] = inDF.rdd.map(row =>
+        Row.fromSeq {row.toSeq ++
+          derivedFieldsToArray(createDerivedFields(countryCodesBC, topDomainsBC, row.getString(queryNameIndex)))})
+
+      // Update data frame schema with newly added columns. This happens b/c we are adding more than one column at once.
+
+      sqlContext.createDataFrame(dataWithSubdomainsRDD, schemaWithAddedFields)
+    }
 
     def addDerivedFields(sparkContext: SparkContext,
                          sqlContext: SQLContext,

@@ -13,16 +13,33 @@ import org.opennetworkinsight.{OniLDACWrapper, SuspiciousConnectsScoreFunction}
 import org.slf4j.Logger
 
 
-class DNSSuspiciousConnectsModel(topicCount: Int,
-                                 ipToTopicMix: Map[String, Array[Double]],
-                                 wordToPerTopicProb: Map[String, Array[Double]],
-                                 timeCuts: Array[Double],
-                                 frameLengthCuts: Array[Double],
-                                 subdomainLengthCuts: Array[Double],
-                                 numberPeriodsCuts: Array[Double],
-                                 entropyCuts: Array[Double]) {
+class DNSSuspiciousConnectsModel(_topicCount: Int,
+                                 _ipToTopicMix: Map[String, Array[Double]],
+                                 _wordToPerTopicProb: Map[String, Array[Double]],
+                                 _timeCuts: Array[Double],
+                                 _frameLengthCuts: Array[Double],
+                                 _subdomainLengthCuts: Array[Double],
+                                 _numberPeriodsCuts: Array[Double],
+                                 _entropyCuts: Array[Double]) {
+
+  val topicCount = _topicCount
+  val ipToTopicMix = _ipToTopicMix
+  val wordToPerTopicProb = _wordToPerTopicProb
+  val timeCuts = _timeCuts
+  val frameLengthCuts = _frameLengthCuts
+  val subdomainLengthCuts = _subdomainLengthCuts
+  val numberPeriodsCuts = _numberPeriodsCuts
+  val entropyCuts = _entropyCuts
 
 
+  /**
+    * Assign scores to a
+ *
+    * @param sc
+    * @param sqlContext
+    * @param inDF
+    * @return
+    */
   def score(sc: SparkContext, sqlContext: SQLContext, inDF: DataFrame): DataFrame = {
 
     val countryCodesBC = sc.broadcast(CountryCodes.CountryCodes)
@@ -69,19 +86,26 @@ class DNSSuspiciousConnectsModel(topicCount: Int,
         queryType: Int,
         queryResponseCode: Int))
 
-    inDF.withColumn(Score, udfScoreFunction(inDF(Timestamp),
-      inDF(UnixTimestamp),
-      inDF(FrameLength),
-      inDF(ClientIP),
-      inDF(QueryName),
-      inDF(QueryClass),
-      inDF(QueryType),
-      inDF(QueryResponseCode)))
+    inDF.withColumn(Score, udfScoreFunction(ModelColumns: _*))
   }
 }
 
+/**
+  * Methods for creating a DNS Suspicious Connects model.
+  */
 object DNSSuspiciousConnectsModel {
 
+  /**
+    * Create a new DNS Suspicious Connects model by training it on a dataframe.
+ *
+    * @param sparkContext
+    * @param sqlContext
+    * @param logger
+    * @param config Analysis configuration object containing CLI parameters.
+    * @param inDF Data used to train the model.
+    * @param topicCount Number of topics (traffic profiles) used to build the model.
+    * @return DNSSuspiciousConnectsModel
+    */
   def trainNewModel(sparkContext: SparkContext,
                     sqlContext: SQLContext,
                     logger: Logger,
@@ -95,14 +119,7 @@ object DNSSuspiciousConnectsModel {
     print("Read source data")
     logger.info("Read source data")
 
-    val selectedDF = inDF.select(Timestamp,
-      UnixTimestamp,
-      FrameLength,
-      ClientIP,
-      QueryName,
-      QueryClass,
-      QueryType,
-      QueryResponseCode)
+    val selectedDF = inDF.select(ModelColumns:_*)
 
     val totalDataDF = selectedDF.unionAll(DNSFeedback.loadFeedbackDF(sparkContext,
       sqlContext,
@@ -153,15 +170,9 @@ object DNSSuspiciousConnectsModel {
       subdomainLengthCuts, entropyCuts, numberPeriodsCuts, countryCodesBC,
       topDomainsBC)
 
-    val dataWithWordDF = df.withColumn(Word, udfWordCreation(
-      df(Timestamp),
-      df(UnixTimestamp),
-      df(FrameLength),
-      df(ClientIP),
-      df(QueryName),
-      df(QueryClass),
-      df(QueryType),
-      df(QueryResponseCode)))
+
+
+    val dataWithWordDF = df.withColumn(Word, udfWordCreation(ModelColumns:_*))
 
     val ipDstWordCounts =
       dataWithWordDF.select(ClientIP, Word).map({ case Row(destIP: String, word: String) => (destIP, word) -> 1 })

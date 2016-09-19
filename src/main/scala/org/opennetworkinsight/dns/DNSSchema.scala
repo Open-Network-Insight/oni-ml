@@ -49,5 +49,24 @@ object DNSSchema {
 
   val ModelColumns = ModelFields.map(col)
 
-  def modelColumns(df: DataFrame) : Seq[Column]  = ModelFields.map(df(_))
+
+  val OAFields = Seq(Timestamp,
+    UnixTimestamp,
+    FrameLength,
+    ClientIP,
+    QueryName,
+    QueryClass,
+    QueryType,
+    QueryResponseCode,
+    Domain,
+    Subdomain,
+    SubdomainLength,
+    NumPeriods,
+    SubdomainEntropy,
+    TopDomain,
+    Word,
+    Score
+  )
+
+  val OAColumns = OAFields.map(col)
 }

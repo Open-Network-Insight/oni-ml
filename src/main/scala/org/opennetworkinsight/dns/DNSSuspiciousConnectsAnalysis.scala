@@ -1,14 +1,13 @@
 package org.opennetworkinsight.dns
 
 import org.apache.spark.SparkContext
-import org.apache.spark.sql.{Row, SQLContext}
+import org.apache.spark.sql.{DataFrame, Row, SQLContext}
 import org.opennetworkinsight.OniLDACWrapper.OniLDACOutput
 import org.opennetworkinsight.SuspiciousConnectsArgumentParser.SuspiciousConnectsConfig
 import org.slf4j.Logger
 import org.apache.spark.SparkContext
 import org.apache.spark.broadcast.Broadcast
 import org.apache.spark.rdd.RDD
-import org.apache.spark.sql.SQLContext
 import org.apache.spark.sql.types.{DoubleType, StringType, StructField, StructType}
 import org.opennetworkinsight.OniLDACWrapper
 import org.opennetworkinsight.OniLDACWrapper.OniLDACOutput
@@ -25,6 +24,7 @@ import org.slf4j.Logger
 object DNSSuspiciousConnectsAnalysis {
 
   def run(config: SuspiciousConnectsConfig, sparkContext: SparkContext, sqlContext: SQLContext, logger: Logger) = {
+    import sqlContext.implicits._
 
     logger.info("Starting DNS suspicious connects analysis.")
 
@@ -35,16 +35,7 @@ object DNSSuspiciousConnectsAnalysis {
 
     val rawDataDF = sqlContext.read.parquet(config.inputPath)
       .filter(Timestamp + " is not null and " + UnixTimestamp + " is not null")
-      .select(Timestamp,
-        UnixTimestamp,
-        FrameLength,
-        ClientIP,
-        QueryName,
-        QueryClass,
-        QueryType,
-        QueryResponseCode)
-
-
+      .select(ModelColumns:_*)
 
     logger.info("Training the model")
     val model =
@@ -56,12 +47,17 @@ object DNSSuspiciousConnectsAnalysis {
     // take the maxResults least probable events of probability below the threshold and sort
 
     val filteredDF = scoredDF.filter(Score +  " <= " + config.threshold)
-    val topRows = DataFrameUtils.dfTakeOrdered(filteredDF, "score", config.maxResults)
-    val scoreIndex = scoredDF.schema.fieldNames.indexOf("score")
-    val outputRDD = sparkContext.parallelize(topRows).sortBy(row => row.getDouble(scoreIndex))
-    logger.info("DNS  suspcicious connects analysis completed.")
+    val topRows = DataFrameUtils.dfTakeOrdered(filteredDF, Score, config.maxResults)
+    val topRowsDF : DataFrame = sqlContext.createDataFrame(sparkContext.parallelize(topRows),filteredDF.schema)
 
-    println("Saving results to : " + config.hdfsScoredConnect)
-    outputRDD.map(_.mkString(config.outputDelimiter)).saveAsTextFile(config.hdfsScoredConnect)
+    // add the OA required columns  here
+    val sideInformationGenerator = new DNSSideInformation(model)
+    val dfWithSideInfo = sideInformationGenerator.addSideInformationForOA(sparkContext, sqlContext, topRowsDF)
+
+    val outputDF = dfWithSideInfo.sort(Score)
+
+    logger.info("DNS  suspcicious connects analysis completed.")
+    logger.info("Saving results to : " + config.hdfsScoredConnect)
+    outputDF.map(_.mkString(config.outputDelimiter)).saveAsTextFile(config.hdfsScoredConnect)
   }
 }
