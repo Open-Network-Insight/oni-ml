@@ -1,15 +1,14 @@
 ##Spark Configuration
 
-oni-ml main component uses Spark and Spark SQL to analyze network events and thus produce a list of least probable events
+oni-ml main component uses Spark and Spark SQL to analyze network events and produce a list of least probable events
 or most suspicious. 
 
-Before running oni-ml users need to set up some configurations required by this component and follow the next recommendations.  
+Before running oni-ml users need to configure the component. Here are our recommended settings.  
 
 ### Yarn tuning
 
-oni-ml Spark application is conceived to [run on a _Yarn_ cluster](http://spark.apache.org/docs/latest/running-on-yarn.html) and depending
-on the amount of data users are planning to analyze it might result very important to tune _Yarn_ cluster before running oni-ml
-or not. 
+oni-ml Spark application has been developed and tested on CDH [Yarn](http://spark.apache.org/docs/latest/running-on-yarn.html) 
+clusters. Careful tuning of the Yarn cluster may be necessary before analyzing large amounts of data with oni-ml.
 
 For small data sets, perhaps a couple of hundreds of gigabytes of CSV data, default _Yarn_ configurations should be enough
 but if users try to analyze hundreds of gigabytes of data in parquet format it's probable that it don't work; _Yarn_ most likely will start killing
@@ -44,55 +43,51 @@ file exist a section for _Spark_ properties, below is the explanation for each o
        
 Besides the variables in duxbay.conf, users can modify the rest of the properties in ml_ops.sh based on their needs.
  
- #### Setting Spark properties
+#### Setting Spark properties
  
  After _Yarn_ cluster has been tuned the next step is to set Spark properties assigning the right values to duxbay.conf _Spark_
  variables. 
   
- #####Number of Executors, Executor Memory, Executor Cores and Executor Memory Overhead
+#####Number of Executors, Executor Memory, Executor Cores and Executor Memory Overhead
  
-  The first thing users need to know is how to set the number of executors and the memory per executor as well as the number of cores.
-  To get that number, users should know the available total memory per node after _Yarn_ tuning, this total memory is determined by _yarn.nodemanager.resource.memory-mb_ 
-  property and the total number of available cores is given by _yarn.nodemanager.resource.cpu-vcores_.
+The first thing users need to know is how to set the number of executors and the memory per executor as well as the number of cores.
+To get that number, users should know the available total memory per node after _Yarn_ tuning, this total memory is determined by _yarn.nodemanager.resource.memory-mb_ 
+property and the total number of available cores is given by _yarn.nodemanager.resource.cpu-vcores_.
  
- Depending on the total physical memory available for _Yarn_ containers and given the number of files and the density 
- of the data in each file, the memory per executor can determine the starting point to set the total amount of executors, take 
- the next scenario as an example: 
+Depending on the total physical memory available for _Yarn_ containers, the memory per executor can determine the 
+starting point to set the total amount of executors. To calculate the memory per executor and number of executors we suggest to
+users follow the next steps:
  
- >To analyze a data set of netflow records, 770 GB parquet format which translates into 12200 files, 70 MB each file average
- we have set 30475 MB of memory for each executor. With a 9 worker nodes cluster, 152 GM memory available for each node we have set the maximum number
- of executors to 43, where 43/9 = 4.7 ~ 5. The reason to allocate only 43 executors is because _Yarn_ is going to create up to 5 in the first 8 nodes and 3 in the 9th node
- and that way we reserve enough resources for the driver; the 9th node will allocate only ~ 90 GB memory for executors 
- and leave the rest available for the driver and other services running.
- 
- In the previous example, the reason to start with 30 GB memory per executor is because given the 152 GB available, 5 executors 
- per node for 8 nodes and 3 executors for the node running the driver, will potentially leave less unused resources. See the next example:
- 
- >Having the same 152 GB physical memory available as the previous example, if we set executors with 50 GB memory we could only 
- set Spark to run with 25 executors. 3 executors the first 8 nodes and 1 executor the 9th node. The reason to do not set 26 executors
-, 3 executors the first 8 nodes and 2 in the 9th executor is because that would try to allocate exactly 100 GB leaving 
-limited resources to the diver and the rest of the running services.
+ 1. Divide the total of physical memory per node by a number between 3 and 5.
+ 2. If the result of the division is something equal or bigger than 30 GB then continue to calculate the number of executors.
+ 3. If the result of the division is less than 30 GB try smaller number.
+ 4. The result of the division will be the memory per executor. Multiply the number used in the first division by the number of nodes.
+ 5. The result of step 4 could be the total executors but users need to consider resources for the application _driver_. Depending on the 
+ result of the multiplication, we recommend to subtract 2 or 3 executors. 
+  
+ See example below: 
+  
+ >Having a cluster with 9 nodes, each node with 152 GB physical memory available: 152/5 ~ 30 GB. 
+ 5 executors x 9 nodes = 45 executors - 2 = 43 executors. 
 
-With the previous example, the unused resources increase to more than 60 GB while in the first example we just leave around 15 GB unused.
+In the previous example, taking off 2 executors ensures enough memory for the application driver.
 
-Perhaps the next question is _why not to set more executors with less memory and have more parallel tasks?_ The answer
-to that question will depend again on the density of the data, the number of files in HDFS and the amount of records per file. 
-Setting a small memory can drive to **Out Of Memory Errors** but users can experiment until they get the right settings for their
-data set.
-
-Continuing with executor cores, users can determine the number of cores per executor having the total of executors and the
-available vcpus per node. For example:
+Users can determine the number of cores per executor having the total of executors and the
+available vcpus per node:
  
- >Taking the first example where we set 43 executors 30475 MB memory each, having a total of 48 vcpus per node and a total of 9 nodes
- we can set up to 10 cores per executor because 9\*48 = 432/43 ~ 10 cores per executor.
+ 6. Divide the available vcpus by the number of executors.
  
- Although it sounds like a good idea to allocate all the available cores, we have seen cases where many cores 
- per executor will cause Spark to assign more task to every executor and that can potentially cause **OOM** errors. In the 
- example above we have tested with up to 6 cores per executor and that worked well.
+ Example:
  
- Lastly, for overhead memory we recommend to use something between 8% and 10% of executor memory.
+ >Having a total of 432 vcpus, 48 per node: 432/43 ~ 10 cores per executor. 
  
- Following the first example, the values for the _Spark_ variables in duxbay.conf would look like this:
+Although it sounds like a good idea to allocate all the available cores, we have seen cases where many cores 
+per executor will cause Spark to assign more task to every executor and that can potentially cause **OOM** errors. 
+Is recommended to keep a close relation between cores and executor memory. 
+ 
+Lastly, for overhead memory we recommend to use something between 8% and 10% of executor memory.
+ 
+Following the example, the values for the _Spark_ variables in duxbay.conf would look like this:
  
             SPK_EXEC='43'
             SPK_EXEC_MEM='30475m'
@@ -101,21 +96,22 @@ available vcpus per node. For example:
  
 #####Driver Memory, Driver Maximum Results and Driver Memory Overhead
  
- During our tests, we have set driver memory the same 
- memory as the executors. If there is a large number of executors with small memory, lest's say less than 5 GB, we then recommend
- allocating a different amount of memory for the driver.
- 
- In oni-ml driver will load and _.collect_ results from oni-lda-c (ML section) which can grow up to gigabytes of data, _.orderBy_ and 
- finally _.saveAsTextFile_. Given those activities for word creation, it's recommended to assign a 
+ oni-ml application executes actions such as _.collect_, _.orderBy_, _.saveAsTextFile_ so we recommend to assign a 
  considerable amount of memory for the driver. 
  
  The same way, driver maximum results should be enough for the serialized results.
  
  Depending on users data volume these two properties can be small as tens of gigabytes for driver and a couple of gigabytes for 
- driver maximum results or get to 50 GB and 8 GB respectively. See the next example:
+ driver maximum results or grow up to 50 GB and 8 GB respectively. Users can follow the next steps to determine the amount of memory
+ for driver and maximum results:
  
- >Following the example in the section above, with 9 nodes, 43 executors, 30 GB memory each executor, we have set driver memory
- to 30GB and 8GB driver maximum results. That's because the data we have processed returned results from ML up to 2.1 GB.
+1. If executor memory is equal or bigger than 30 GB, make driver memory the same as executor memory and driver maximum results
+a value equal or bigger than 6 GB.
+2. If executor memory is less than 30 GB but data to be analyzed is equal or bigger than 100 GB make driver something between 30 GB
+and 50 GB. Driver maximum results should be something equal or bigger than 8 GB. 
+ 
+ >Following the example in the previous section, with 9 nodes, 43 executors, 30 GB memory each executor, we can set driver memory
+ to 30GB and 8GB driver maximum results.
  
  Memory overhead for driver can be set to something between 8% and 10% of driver memory.
  
@@ -124,6 +120,7 @@ available vcpus per node. For example:
         SPK_DRIVER_MEM='30475m'
         SPK_DRIVER_MAX_RESULTS='8g'
         SPK_DRIVER_MEM_OVERHEAD='3047'
+        
  ![DriverMemory](https://raw.githubusercontent.com/Open-Network-Insight/oni-docs/master/images/Driver%20Memory.png)
  
  _Representation of memory allocation in driver node._
@@ -131,9 +128,9 @@ available vcpus per node. For example:
  
  For more information about Spark properties click [here](http://spark.apache.org/docs/latest/configuration.html).
  
- ###Known Spark error messages running oni-ml
+###Known Spark error messages running oni-ml
  
- ####Out Of Memory Error
+####Out Of Memory Error
  
 This issue includes _java.lang.OutOfMemoryError: Java heap space_ and _java.lang.OutOfMemoryError : GC overhead limit exceeded_.
 When users get OOME can be for many different issues but we have identified a couple of important points or reasons for this
