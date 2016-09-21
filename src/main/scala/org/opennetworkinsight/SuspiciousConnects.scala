@@ -1,9 +1,8 @@
 package org.opennetworkinsight
 
-import org.apache.log4j.{Level, Logger}
-import org.apache.spark.{SparkConf, SparkContext}
+import org.apache.log4j.{Level, LogManager, Logger}
 import org.apache.spark.sql.SQLContext
-import org.slf4j.LoggerFactory
+import org.apache.spark.{SparkConf, SparkContext}
 import org.opennetworkinsight.SuspiciousConnectsArgumentParser.SuspiciousConnectsConfig
 import org.opennetworkinsight.dns.DNSSuspiciousConnects
 import org.opennetworkinsight.netflow.FlowSuspiciousConnects
@@ -32,7 +31,10 @@ object SuspiciousConnects {
 
     parser.parse(args, SuspiciousConnectsConfig()) match {
       case Some(config) =>
-        val logger = LoggerFactory.getLogger(this.getClass)
+
+        val logger = LogManager.getLogger("SuspiciousConnectsAnalysis")
+        logger.setLevel(Level.INFO)
+
         Logger.getLogger("org").setLevel(Level.OFF)
         Logger.getLogger("akka").setLevel(Level.OFF)
 

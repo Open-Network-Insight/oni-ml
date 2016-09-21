@@ -1,5 +1,6 @@
 package org.opennetworkinsight.netflow
 
+import org.apache.log4j.Logger
 import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.functions._
@@ -7,7 +8,6 @@ import org.apache.spark.sql.types.{DoubleType, StringType, StructField, StructTy
 import org.apache.spark.sql.{DataFrame, Row, SQLContext}
 import org.opennetworkinsight.netflow.{FlowSchema => Schema}
 import org.opennetworkinsight.utilities.Quantiles
-import org.slf4j.Logger
 
 object FlowWordCreation {
 
