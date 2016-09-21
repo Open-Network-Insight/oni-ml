@@ -29,11 +29,11 @@ object SuspiciousConnects {
 
     val parser = SuspiciousConnectsArgumentParser.parser
 
+    val logger = LogManager.getLogger("SuspiciousConnectsAnalysis")
+    logger.setLevel(Level.INFO)
+
     parser.parse(args, SuspiciousConnectsConfig()) match {
       case Some(config) =>
-
-        val logger = LogManager.getLogger("SuspiciousConnectsAnalysis")
-        logger.setLevel(Level.INFO)
 
         Logger.getLogger("org").setLevel(Level.OFF)
         Logger.getLogger("akka").setLevel(Level.OFF)
@@ -48,12 +48,12 @@ object SuspiciousConnects {
           case "flow" => FlowSuspiciousConnects.run(config, sparkContext, sqlContext, logger)
           case "dns" => DNSSuspiciousConnects.run(config, sparkContext, sqlContext, logger)
           case "proxy" => ProxySuspiciousConnectsAnalysis.run(config, sparkContext, sqlContext, logger)
-          case _ => println("ERROR:  unsupported (or misspelled) analysis: " + analysis)
+          case _ => logger.error("Unsupported (or misspelled) analysis: " + analysis)
         }
 
         sparkContext.stop()
 
-      case None => println("Error parsing arguments")
+      case None => logger.error("Error parsing arguments")
     }
 
     System.exit(0)

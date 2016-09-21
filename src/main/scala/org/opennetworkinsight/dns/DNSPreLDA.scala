@@ -100,7 +100,7 @@ object DNSPreLDA {
           QueryResponseCode)
     }
 
-    print("Read source data")
+    logger.info("Read source data")
     val totalDataDF = {
       if (!scoredFileExists) {
         rawData
