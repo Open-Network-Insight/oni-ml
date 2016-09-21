@@ -4,7 +4,7 @@ version := "1.1"
 
 scalaVersion := "2.10.6"
 
-import sbtassembly.Plugin.AssemblyKeys._
+import AssemblyKeys._
 
 assemblySettings
 
