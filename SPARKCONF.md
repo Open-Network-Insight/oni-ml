@@ -41,29 +41,7 @@ file exist a section for _Spark_ properties, below is the explanation for each o
             SPK_EXEC_CORES=''           ---> Cores per executor i.e. 4
             SPK_DRIVER_MEM_OVERHEAD=''  ---> Driver memory overhead in MB i.e. 3047. Note that there is no "m" at the end.
             SPAK_EXEC_MEM_OVERHEAD=''   ---> Executor memory overhead in MB i.e. 3047. Note that there is no "m" at the end.
-
-The following code is an extract of ml_ops.sh that shows how the application is executed and  how 
-the variables are assigned to _Spark_ properties:
-
-            spark-submit --class "org.opennetworkinsight.SuspiciousConnects" \
-              --master yarn-client \
-              --driver-memory ${SPK_DRIVER_MEM} \
-              --conf spark.driver.maxResultSize=${SPK_DRIVER_MAX_RESULTS} \
-              --conf spark.driver.maxPermSize=512m \
-              --conf spark.driver.cores=1 \
-              --conf spark.dynamicAllocation.enabled=true \
-              --conf spark.dynamicAllocation.minExecutors=1 \
-              --conf spark.dynamicAllocation.maxExecutors=${SPK_EXEC} \
-              --conf spark.executor.cores=${SPK_EXEC_CORES} \
-              --conf spark.executor.memory=${SPK_EXEC_MEM} \
-              --conf "spark.executor.extraJavaOptions=-XX:MaxPermSize=512M -XX:PermSize=512M" \
-              --conf spark.shuffle.io.preferDirectBufs=false    \
-              --conf spark.kryoserializer.buffer.max=512m \
-              --conf spark.shuffle.service.enabled=true \
-              --conf spark.yarn.am.waitTime=1000000 \
-              --conf spark.yarn.driver.memoryOverhead=${SPK_DRIVER_MEM_OVERHEAD} \
-              --conf spark.yarn.executor.memoryOverhead=${SPAK_EXEC_MEM_OVERHEAD} target/scala-2.10/oni-ml-assembly-1.1.jar
-              
+       
 Besides the variables in duxbay.conf, users can modify the rest of the properties in ml_ops.sh based on their needs.
  
  #### Setting Spark properties
