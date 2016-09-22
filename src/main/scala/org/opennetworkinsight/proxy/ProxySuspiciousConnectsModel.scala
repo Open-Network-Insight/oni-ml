@@ -132,7 +132,8 @@ object ProxySuspiciousConnectsModel {
       config.ldaPath,
       config.localUser,
       config.analysis,
-      config.nodes)
+      config.nodes,
+      config.ldaPRGSeed)
 
     new ProxySuspiciousConnectsModel(topicCount, documentResults, wordResults, timeCuts, entropyCuts, agentCuts)
   }
