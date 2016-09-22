@@ -1,12 +1,12 @@
 package org.opennetworkinsight.netflow
 
+import org.apache.log4j.Logger
 import org.apache.spark.SparkContext
 import org.apache.spark.broadcast.Broadcast
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.{DataFrame, Row, SQLContext}
 import org.opennetworkinsight.netflow.FlowSchema._
-import org.slf4j.Logger
 
 /**
   * Contains routines for scoring incoming netflow records from a netflow suspicious connections model.

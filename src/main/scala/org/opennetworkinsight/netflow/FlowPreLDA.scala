@@ -1,12 +1,12 @@
 
 package org.opennetworkinsight.netflow
 
+import org.apache.log4j.Logger
 import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.{DataFrame, Row, SQLContext}
 import org.opennetworkinsight.OniLDACWrapper.OniLDACInput
 import org.opennetworkinsight.netflow.FlowSchema._
-import org.slf4j.Logger
 
 import scala.io.Source
 

@@ -1,12 +1,12 @@
 
 package org.opennetworkinsight.dns
 
+import org.apache.log4j.Logger
 import org.apache.spark.SparkContext
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.{DataFrame, Row, SQLContext}
 import org.opennetworkinsight.SuspiciousConnectsScoreFunction
 import org.opennetworkinsight.dns.DNSSchema._
-import org.slf4j.Logger
 
 /**
   * Contains routines for scoring incoming netflow records from a DNS suspicious connections model.

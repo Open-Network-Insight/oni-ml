@@ -1,5 +1,6 @@
 package org.opennetworkinsight.dns
 
+import org.apache.log4j.Logger
 import org.apache.spark.SparkContext
 import org.apache.spark.broadcast.Broadcast
 import org.apache.spark.rdd.RDD
@@ -8,7 +9,6 @@ import org.apache.spark.sql.types.{DoubleType, StringType, StructField, StructTy
 import org.apache.spark.sql.{DataFrame, Row, SQLContext}
 import org.opennetworkinsight.dns.{DNSSchema => Schema}
 import org.opennetworkinsight.utilities.{Entropy, Quantiles}
-import org.slf4j.Logger
 
 import scala.io.Source
 

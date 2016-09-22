@@ -1,11 +1,11 @@
 package org.opennetworkinsight.netflow
 
+import org.apache.log4j.Logger
 import org.apache.spark.SparkContext
 import org.apache.spark.sql.SQLContext
 import org.opennetworkinsight.OniLDACWrapper
 import org.opennetworkinsight.OniLDACWrapper.OniLDACOutput
 import org.opennetworkinsight.SuspiciousConnectsArgumentParser.SuspiciousConnectsConfig
-import org.slf4j.Logger
 
 object FlowSuspiciousConnects {
 
