@@ -11,7 +11,7 @@ oni-ml Spark application has been developed and tested on CDH [Yarn](http://spar
 clusters. Careful tuning of the Yarn cluster may be necessary before analyzing large amounts of data with oni-ml.
 
 For small data sets, perhaps a couple of hundreds of gigabytes of CSV data, default _Yarn_ configurations should be enough
-but if users try to analyze hundreds of gigabytes of data in parquet format it's probable that it don't work; _Yarn_ most likely will start killing
+but if users try to analyze hundreds of gigabytes of data in parquet format it's pr/obable that it don't work; _Yarn_ most likely will start killing
  containers or will terminate the application with Out Of Memory errors.
 
 This document is not intended to explain in detail how to tune _Yarn_ but instead it provides some articles we used for this task:
@@ -30,7 +30,7 @@ effective way. Since not all clusters are the same and not all users are plannin
 variables that users need to configure before running oni-ml.
 
 After installing oni-setup users will find the [duxbay.conf](https://github.com/Open-Network-Insight/oni-setup/blob/master/duxbay.conf) 
-file under /etc folder. This file contains all the required configuration tu run oni-ml, as explained in [INSTALL.md](https://github.com/Open-Network-Insight/oni-ml/blob/master/INSTALL.md). In this
+file under /etc folder. This file contains all the required configuration to run oni-ml, as explained in [INSTALL.md](https://github.com/Open-Network-Insight/oni-ml/blob/master/INSTALL.md). In this
 file exist a section for _Spark_ properties, below is the explanation for each of those variables:
 
             SPK_EXEC=''                 ---> Maximumn number of executors
