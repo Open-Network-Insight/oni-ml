@@ -31,8 +31,7 @@ class DNSSideInformation(model: DNSSuspiciousConnectsModel) {
                               sqlContext: SQLContext,
                               inDF: DataFrame): DataFrame = {
 
-    val countryCodesBC = sparkContext.broadcast(CountryCodes.CountryCodes)
-    val topDomainsBC = sparkContext.broadcast(TopDomains.TOP_DOMAINS)
+    val topDomainsBC = sparkContext.broadcast(TopDomains.TopDomains)
 
     val schemaWithAddedFields = StructType(inDF.schema.fields ++ DNSSideInformation.SideInfoSchema)
 
@@ -42,21 +41,18 @@ class DNSSideInformation(model: DNSSuspiciousConnectsModel) {
       model.subdomainLengthCuts,
       model.entropyCuts,
       model.numberPeriodsCuts,
-      countryCodesBC,
       topDomainsBC)
 
-
-    import addSideInformationFunction.{addSideFieldSeq, getIntegerField, getLongField, getStringField}
-
     val dataWithSideInformation: RDD[Row] = inDF.rdd.map(row =>
-      Row.fromSeq {row.toSeq ++ addSideFieldSeq(timeStamp = getStringField(row, Timestamp),
-          unixTimeStamp = getLongField(row, UnixTimestamp),
-          frameLength = getIntegerField(row, FrameLength),
-          clientIP = getStringField(row, ClientIP),
-          queryName = getStringField(row, QueryName),
-          queryClass = getStringField(row, QueryClass),
-          dnsQueryType = getIntegerField(row, QueryType),
-          dnsQueryRcode = getIntegerField(row, QueryResponseCode))})
+      Row.fromSeq {row.toSeq ++ addSideInformationFunction.getSideFields(row,
+        timeStampCol= Timestamp,
+          unixTimeStampCol = UnixTimestamp,
+          frameLengthCol = FrameLength,
+          clientIPCol = ClientIP,
+          queryNameCol = QueryName,
+          queryClassCol = QueryClass,
+          dnsQueryTypeCol = QueryType,
+          dnsQueryRCodeCol = QueryResponseCode)})
 
     sqlContext.createDataFrame(dataWithSideInformation, schemaWithAddedFields)
   }

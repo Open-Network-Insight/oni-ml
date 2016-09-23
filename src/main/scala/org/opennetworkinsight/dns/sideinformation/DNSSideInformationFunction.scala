@@ -5,6 +5,16 @@ import org.apache.spark.sql.Row
 import org.opennetworkinsight.dns.DNSWordCreation
 import org.opennetworkinsight.utilities.DomainProcessor.{DomainInfo, extractDomainInfo}
 
+/**
+  * Add side information for OA to a dataframe.
+  * @param fieldNames
+  * @param frameLengthCuts
+  * @param timeCuts
+  * @param subdomainLengthCuts
+  * @param entropyCuts
+  * @param numberPeriodsCuts
+  * @param topDomainsBC
+  */
 
 class DNSSideInformationFunction(fieldNames: Array[String],
                                  frameLengthCuts: Array[Double],
@@ -12,19 +22,30 @@ class DNSSideInformationFunction(fieldNames: Array[String],
                                  subdomainLengthCuts: Array[Double],
                                  entropyCuts: Array[Double],
                                  numberPeriodsCuts: Array[Double],
-                                 countryCodesBC: Broadcast[Set[String]],
                                  topDomainsBC: Broadcast[Set[String]]) extends Serializable {
 
   val dnsWordCreator = new DNSWordCreation(frameLengthCuts, timeCuts, subdomainLengthCuts, entropyCuts, numberPeriodsCuts, topDomainsBC)
 
-  def getSideFields(timeStamp: String,
-                    unixTimeStamp: Long,
-                    frameLength: Int,
-                    clientIP: String,
-                    queryName: String,
-                    queryClass: String,
-                    dnsQueryType: Int,
-                    dnsQueryRcode: Int): SideFields = {
+
+  def getSideFields(row: Row,
+                    timeStampCol: String,
+                    unixTimeStampCol: String,
+                    frameLengthCol: String,
+                    clientIPCol: String,
+                    queryNameCol: String,
+                    queryClassCol: String,
+                    dnsQueryTypeCol: String,
+                    dnsQueryRCodeCol: String): Seq[Any] = {
+
+
+    val timeStamp = row.getString(fieldNames.indexOf(timeStampCol))
+    val unixTimeStamp = row.getLong(fieldNames.indexOf(unixTimeStampCol))
+    val frameLength = row.getInt(fieldNames.indexOf(frameLengthCol))
+    val clientIP = row.getString(fieldNames.indexOf(clientIPCol))
+    val queryName = row.getString(fieldNames.indexOf(queryNameCol))
+    val queryClass = row.getString(fieldNames.indexOf(queryClassCol))
+    val dnsQueryType = row.getInt(fieldNames.indexOf(dnsQueryTypeCol))
+    val dnsQueryRcode = row.getInt(fieldNames.indexOf(dnsQueryRCodeCol))
 
     val DomainInfo(domain, topDomain, subdomain, subdomainLength, subdomainEntropy, numPeriods) =
       extractDomainInfo(queryName, topDomainsBC)
@@ -39,52 +60,6 @@ class DNSSideInformationFunction(fieldNames: Array[String],
       dnsQueryType,
       dnsQueryRcode)
 
-    SideFields(domain = domain,
-      topDomain = topDomain,
-      subdomain = subdomain,
-      subdomainLength = subdomainLength,
-      subdomainEntropy = subdomainEntropy,
-      numPeriods = numPeriods,
-      word = word)
+    Seq(domain, subdomain, subdomainLength, subdomainEntropy, topDomain, numPeriods, word)
   }
-
-
-  def addSideFieldSeq(timeStamp: String,
-                      unixTimeStamp: Long,
-                      frameLength: Int,
-                      clientIP: String,
-                      queryName: String,
-                      queryClass: String,
-                      dnsQueryType: Int,
-                      dnsQueryRcode: Int): Seq[Any] = {
-
-    val sideFields = getSideFields(timeStamp,
-      unixTimeStamp,
-      frameLength,
-      clientIP,
-      queryName,
-      queryClass,
-      dnsQueryType,
-      dnsQueryRcode)
-
-    // this is probably the bug
-    // the order does not match the frame schema
-    /*
-    object DNSSideInformation {
-  val sideFieldSchema = StructType(List(DomainField,
-    SubdomainField,
-    SubdomainLengthField,
-    SubdomainEntropyField,
-    TopDomainField,
-    NumPeriodsField,
-    WordField))
-}
-     */
-    Seq(sideFields.domain, sideFields.subdomain, sideFields.subdomainLength, sideFields.subdomainEntropy, sideFields.topDomain, sideFields.numPeriods, sideFields.word)
-  }
-
-
-  def getStringField(r: Row, field: String) = r.getString(fieldNames.indexOf(field))
-  def getIntegerField(r: Row, field: String) = r.getInt(fieldNames.indexOf(field))
-  def getLongField(r: Row, field: String) = r.getLong(fieldNames.indexOf(field))
 }

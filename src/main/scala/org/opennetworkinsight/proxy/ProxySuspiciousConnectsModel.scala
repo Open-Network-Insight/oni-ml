@@ -39,7 +39,7 @@ class ProxySuspiciousConnectsModel(topicCount: Int,
     */
   def score(sc: SparkContext, dataFrame: DataFrame): DataFrame = {
 
-    val topDomains: Broadcast[Set[String]] = sc.broadcast(TopDomains.TOP_DOMAINS)
+    val topDomains: Broadcast[Set[String]] = sc.broadcast(TopDomains.TopDomains)
 
     val agentToCount: Map[String, Long] =
       dataFrame.select(UserAgent).rdd.map({ case Row(ua: String) => (ua, 1L) }).reduceByKey(_ + _).collect().toMap
@@ -172,7 +172,7 @@ object ProxySuspiciousConnectsModel {
                         entropyCuts: Array[Double],
                         agentCuts: Array[Double]): RDD[OniLDACInput] = {
 
-    val topDomains: Broadcast[Set[String]] = sc.broadcast(TopDomains.TOP_DOMAINS)
+    val topDomains: Broadcast[Set[String]] = sc.broadcast(TopDomains.TopDomains)
 
     val agentToCountBC = sc.broadcast(agentToCount)
     val udfWordCreation = ProxyWordCreation.udfWordCreation(topDomains, agentToCountBC, timeCuts, entropyCuts, agentCuts)

@@ -70,7 +70,7 @@ class DNSSuspiciousConnectsModel(inTopicCount: Int,
   def score(sc: SparkContext, sqlContext: SQLContext, inDF: DataFrame): DataFrame = {
 
     val countryCodesBC = sc.broadcast(CountryCodes.CountryCodes)
-    val topDomainsBC = sc.broadcast(TopDomains.TOP_DOMAINS)
+    val topDomainsBC = sc.broadcast(TopDomains.TopDomains)
     val ipToTopicMixBC = sc.broadcast(ipToTopicMix)
     val wordToPerTopicProbBC = sc.broadcast(wordToPerTopicProb)
 
@@ -157,7 +157,7 @@ object DNSSuspiciousConnectsModel {
       config.duplicationFactor))
 
     val countryCodesBC = sparkContext.broadcast(CountryCodes.CountryCodes)
-    val topDomainsBC = sparkContext.broadcast(TopDomains.TOP_DOMAINS)
+    val topDomainsBC = sparkContext.broadcast(TopDomains.TopDomains)
 
     // create quantile cut-offs
 
