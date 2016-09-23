@@ -1,16 +1,16 @@
 package org.opennetworkinsight.proxy
 
+import org.apache.log4j.Logger
 import org.apache.spark.SparkContext
 import org.apache.spark.broadcast.Broadcast
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.{DataFrame, Row, SQLContext}
-import org.opennetworkinsight.{OniLDACWrapper, SuspiciousConnectsScoreFunction}
 import org.opennetworkinsight.OniLDACWrapper.{OniLDACInput, OniLDACOutput}
 import org.opennetworkinsight.SuspiciousConnectsArgumentParser.SuspiciousConnectsConfig
-import org.opennetworkinsight.utilities._
-import org.slf4j.Logger
 import org.opennetworkinsight.proxy.ProxySchema._
+import org.opennetworkinsight.utilities._
+import org.opennetworkinsight.{OniLDACWrapper, SuspiciousConnectsScoreFunction}
 
 /**
   * Encapsulation of a proxy suspicious connections model.
@@ -132,7 +132,8 @@ object ProxySuspiciousConnectsModel {
       config.ldaPath,
       config.localUser,
       config.analysis,
-      config.nodes)
+      config.nodes,
+      config.ldaPRGSeed)
 
     new ProxySuspiciousConnectsModel(topicCount, documentResults, wordResults, timeCuts, entropyCuts, agentCuts)
   }

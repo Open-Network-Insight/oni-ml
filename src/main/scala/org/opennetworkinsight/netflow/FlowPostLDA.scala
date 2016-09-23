@@ -1,11 +1,12 @@
 package org.opennetworkinsight.netflow
 
-import org.apache.log4j.{Logger => apacheLogger}
+import org.apache.log4j.Logger
 import org.apache.spark.SparkContext
+import org.apache.spark.broadcast.Broadcast
+import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.{DataFrame, Row, SQLContext}
 import org.opennetworkinsight.netflow.FlowSchema._
-import org.slf4j.Logger
 
 /**
   * Contains routines for scoring incoming netflow records from a netflow suspicious connections model.
@@ -16,7 +17,7 @@ object FlowPostLDA {
                   resultsFilePath: String,
                   outputDelimiter: String,
                   threshold: Double, topK: Int,
-                  ipToTopicMixes: Map[String, Array[Double]],
+                  docToTopicMix: Map[String, Array[Double]],
                   wordToProbPerTopic: Map[String, Array[Double]],
                   sc: SparkContext,
                   sqlContext: SQLContext,
@@ -24,12 +25,13 @@ object FlowPostLDA {
 
     logger.info("loading machine learning results")
 
+    import sqlContext.implicits._
     logger.info("loading data")
     val totalDataDF: DataFrame = {
       sqlContext.read.parquet(inputPath)
-        .filter("trhour BETWEEN 0 AND 23 AND  " +
-          "trminute BETWEEN 0 AND 59 AND  " +
-          "trsec BETWEEN 0 AND 59")
+        .filter(Hour + " BETWEEN 0 AND 23 AND  " +
+          Minute + " BETWEEN 0 AND 59 AND  " +
+          Second + " BETWEEN 0 AND 59")
         .select(TimeReceived,
           Year,
           Month,
@@ -63,67 +65,51 @@ object FlowPostLDA {
 
     logger.info("Computing conditional probability")
 
-    val dataWithSrcScore = score(sc, dataWithWord, ipToTopicMixes, wordToProbPerTopic, SourceScore, SourceIP, SourceWord)
-    val dataWithDestScore = score(sc, dataWithSrcScore, ipToTopicMixes, wordToProbPerTopic, DestinationScore, DestinationIP, DestinationWord)
+    val docToTopicMixRDD: RDD[(String, Array[Double])] = sc.parallelize(docToTopicMix.toSeq)
+
+    val docToTopicMixDF = docToTopicMixRDD.map({ case (doc, probabilities) => DocTopicMix(doc, probabilities) }).toDF
+
+    val words = sc.broadcast(wordToProbPerTopic)
+
+    val dataWithSrcScore = score(sc, dataWithWord, docToTopicMixDF, words, SourceScore, SourceIP, SourceProbabilities, SourceWord)
+    val dataWithDestScore = score(sc, dataWithSrcScore, docToTopicMixDF, words, DestinationScore, DestinationIP, DestinationProbabilities, DestinationWord)
     val dataScored = minimumScore(dataWithDestScore)
 
     logger.info("Persisting data")
-    val filteredDF = dataScored.filter(MinimumScore + " <" + threshold)
-
-    val count = filteredDF.count
-
-    val takeCount  = if (topK == -1 || count < topK) {
-      count.toInt
-    } else {
-      topK
-    }
-
-    val minimumScoreIndex = filteredDF.schema.fieldNames.indexOf(MinimumScore)
-
-    class DataOrdering() extends Ordering[Row] {
-      def compare(row1: Row, row2: Row) = row1.getDouble(minimumScoreIndex).compare(row2.getDouble(minimumScoreIndex))
-    }
-
-    implicit val ordering = new DataOrdering()
-
-    val top: Array[Row] = filteredDF.rdd.takeOrdered(takeCount)
-
-    val outputRDD = sc.parallelize(top).sortBy(row => row.getDouble(minimumScoreIndex))
-
-    // Using dropRight as we don't need last column MinimumScore, only SourceScore and DestinationScore
-    outputRDD.map(row => Row.fromSeq(row.toSeq.dropRight(1))).map(_.mkString(outputDelimiter)).saveAsTextFile(resultsFilePath)
+    val filteredDF = dataScored.filter(MinimumScore + " <= " + threshold)
+    filteredDF.orderBy(MinimumScore).limit(topK).rdd.map(row => Row.fromSeq(row.toSeq.dropRight(1))).map(_.mkString(outputDelimiter)).saveAsTextFile(resultsFilePath)
 
     logger.info("Flow post LDA completed")
-
   }
 
   def score(sc: SparkContext,
             dataFrame: DataFrame,
-            ipToTopicMixes: Map[String, Array[Double]],
-            wordToProbPerTopic: Map[String, Array[Double]],
-            newColumnName: String,
+            docToTopicMixesDF: DataFrame,
+            wordToProbPerTopic: Broadcast[Map[String, Array[Double]]],
+            scoreColumnName: String,
             ipColumnName: String,
+            ipProbabilitiesColumnName: String,
             wordColumnName: String): DataFrame = {
 
-    val topics = sc.broadcast(ipToTopicMixes)
-    val words = sc.broadcast(wordToProbPerTopic)
+    val dataWithIpProbJoin = dataFrame.join(docToTopicMixesDF, dataFrame(ipColumnName) === docToTopicMixesDF(Doc))
 
-    def scoreFunction(ip: String, word: String): Double = {
-      val uniformProb = Array.fill(20) {
-        0.05d
-      }
+    var newSchemaColumns = dataFrame.schema.fieldNames :+ Probabilities + " as " + ipProbabilitiesColumnName
+    val dataWithIpProb = dataWithIpProbJoin.selectExpr(newSchemaColumns: _*)
 
-      val topicGivenDocProbs = topics.value.getOrElse(ip, uniformProb)
-      val wordGivenTopicProbs = words.value.getOrElse(word, uniformProb)
+    def scoreFunction(word: String, ipProbabilities: Seq[Double]): Double = {
+      val uniformProb = Array.fill(20)(0.05d)
+      val wordGivenTopicProb = wordToProbPerTopic.value.getOrElse(word, uniformProb)
 
-      topicGivenDocProbs.zip(wordGivenTopicProbs)
+      ipProbabilities.zip(wordGivenTopicProb)
         .map({ case (pWordGivenTopic, pTopicGivenDoc) => pWordGivenTopic * pTopicGivenDoc })
         .sum
     }
 
-    def udfScoreFunction = udf((ip: String, word: String) => scoreFunction(ip, word))
+    def udfScoreFunction = udf((word: String, ipProbabilities: Seq[Double]) => scoreFunction(word, ipProbabilities))
 
-    dataFrame.withColumn(newColumnName, udfScoreFunction(dataFrame(ipColumnName), dataFrame(wordColumnName)))
+    val result: DataFrame = dataWithIpProb.withColumn(scoreColumnName, udfScoreFunction(dataWithIpProb(wordColumnName), dataWithIpProb(ipProbabilitiesColumnName)))
+    newSchemaColumns = dataFrame.schema.fieldNames :+ scoreColumnName
+    result.select(newSchemaColumns.map(col): _*)
   }
 
   def minimumScore(dataWithDestScore: DataFrame): DataFrame = {
@@ -138,4 +124,6 @@ object FlowPostLDA {
     dataWithDestScore.withColumn(MinimumScore,
       udfMinimumScoreFunction(dataWithDestScore(SourceScore), dataWithDestScore(DestinationScore)))
   }
+
+  case class DocTopicMix(doc: String, probabilities: Array[Double]) extends Serializable
 }

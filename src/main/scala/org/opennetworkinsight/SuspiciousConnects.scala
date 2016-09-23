@@ -1,9 +1,8 @@
 package org.opennetworkinsight
 
-import org.apache.log4j.{Level, Logger}
-import org.apache.spark.{SparkConf, SparkContext}
+import org.apache.log4j.{Level, LogManager, Logger}
 import org.apache.spark.sql.SQLContext
-import org.slf4j.LoggerFactory
+import org.apache.spark.{SparkConf, SparkContext}
 import org.opennetworkinsight.SuspiciousConnectsArgumentParser.SuspiciousConnectsConfig
 import org.opennetworkinsight.dns.DNSSuspiciousConnectsAnalysis
 import org.opennetworkinsight.netflow.FlowSuspiciousConnects
@@ -30,9 +29,12 @@ object SuspiciousConnects {
 
     val parser = SuspiciousConnectsArgumentParser.parser
 
+    val logger = LogManager.getLogger("SuspiciousConnectsAnalysis")
+    logger.setLevel(Level.INFO)
+
     parser.parse(args, SuspiciousConnectsConfig()) match {
       case Some(config) =>
-        val logger = LoggerFactory.getLogger(this.getClass)
+
         Logger.getLogger("org").setLevel(Level.OFF)
         Logger.getLogger("akka").setLevel(Level.OFF)
 
@@ -46,12 +48,12 @@ object SuspiciousConnects {
           case "flow" => FlowSuspiciousConnects.run(config, sparkContext, sqlContext, logger)
           case "dns" => DNSSuspiciousConnectsAnalysis.run(config, sparkContext, sqlContext, logger)
           case "proxy" => ProxySuspiciousConnectsAnalysis.run(config, sparkContext, sqlContext, logger)
-          case _ => println("ERROR:  unsupported (or misspelled) analysis: " + analysis)
+          case _ => logger.error("Unsupported (or misspelled) analysis: " + analysis)
         }
 
         sparkContext.stop()
 
-      case None => println("Error parsing arguments")
+      case None => logger.error("Error parsing arguments")
     }
 
     System.exit(0)
