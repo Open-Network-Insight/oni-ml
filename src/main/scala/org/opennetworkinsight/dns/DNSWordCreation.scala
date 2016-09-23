@@ -1,16 +1,14 @@
 package org.opennetworkinsight.dns
 
-
-import org.apache.log4j.Logger
-import org.apache.spark.SparkContext
 import org.apache.spark.broadcast.Broadcast
 import org.apache.spark.sql.functions._
+import org.opennetworkinsight.utilities.DomainProcessor.{DomainInfo, extractDomainInfo}
 import org.opennetworkinsight.utilities.Quantiles
-import org.opennetworkinsight.utilities.DomainProcessor.{extractDomainInfo, DomainInfo}
 
 
 /**
   * Convert DNS log entries into "words" for topic modelling analyses.
+  *
   * @param frameLengthCuts
   * @param timeCuts
   * @param subdomainLengthCuts
@@ -59,13 +57,13 @@ class DNSWordCreation(frameLengthCuts: Array[Double],
   /**
     * Simplify a DNS log entry into a word.
     *
-    * @param timeStamp Timestamp as a string.
+    * @param timeStamp     Timestamp as a string.
     * @param unixTimeStamp Unix timestamp as a 64 bit integer
-    * @param frameLength Framelength as an integer.
-    * @param clientIP IP of client making DNS query as string.
-    * @param queryName URL being queried.
-    * @param queryClass Query class as string.
-    * @param dnsQueryType Query type as integer.
+    * @param frameLength   Framelength as an integer.
+    * @param clientIP      IP of client making DNS query as string.
+    * @param queryName     URL being queried.
+    * @param queryClass    Query class as string.
+    * @param dnsQueryType  Query type as integer.
     * @param dnsQueryRcode Query response code as integer.
     * @return The word representation of the DNS entry.
     */
