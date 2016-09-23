@@ -84,9 +84,24 @@ hdfs dfs -rm -R -f ${HDFS_SCORED_CONNECTS}
 
 ${MPI_PREP_CMD}
 
-time spark-submit --class "org.opennetworkinsight.SuspiciousConnects" --master yarn-client --executor-memory  ${SPK_EXEC_MEM} \
-  --driver-memory 2g --num-executors ${SPK_EXEC} --executor-cores 1 --conf spark.shuffle.io.preferDirectBufs=false    \
-  --conf spark.shuffle.service.enabled=true --conf spark.driver.maxResultSize="2g" target/scala-2.10/oni-ml-assembly-1.1.jar \
+time spark-submit --class "org.opennetworkinsight.SuspiciousConnects" \
+  --master yarn-client \
+  --driver-memory ${SPK_DRIVER_MEM} \
+  --conf spark.driver.maxResultSize=${SPK_DRIVER_MAX_RESULTS} \
+  --conf spark.driver.maxPermSize=512m \
+  --conf spark.driver.cores=1 \
+  --conf spark.dynamicAllocation.enabled=true \
+  --conf spark.dynamicAllocation.minExecutors=1 \
+  --conf spark.dynamicAllocation.maxExecutors=${SPK_EXEC} \
+  --conf spark.executor.cores=${SPK_EXEC_CORES} \
+  --conf spark.executor.memory=${SPK_EXEC_MEM} \
+  --conf "spark.executor.extraJavaOptions=-XX:MaxPermSize=512M -XX:PermSize=512M" \
+  --conf spark.shuffle.io.preferDirectBufs=false    \
+  --conf spark.kryoserializer.buffer.max=512m \
+  --conf spark.shuffle.service.enabled=true \
+  --conf spark.yarn.am.waitTime=1000000 \
+  --conf spark.yarn.driver.memoryOverhead=${SPK_DRIVER_MEM_OVERHEAD} \
+  --conf spark.yarn.executor.memoryOverhead=${SPAK_EXEC_MEM_OVERHEAD} target/scala-2.10/oni-ml-assembly-1.1.jar \
   --analysis ${DSOURCE} \
   --input ${RAWDATA_PATH}  \
   --dupfactor ${DUPFACTOR} \

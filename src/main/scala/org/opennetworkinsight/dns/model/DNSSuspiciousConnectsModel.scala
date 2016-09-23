@@ -13,7 +13,7 @@ import org.opennetworkinsight.dns.DNSSchema._
 import org.opennetworkinsight.dns.DNSWordCreation
 import org.opennetworkinsight.utilities.{CountryCodes, DomainProcessor, Quantiles, TopDomains}
 import org.opennetworkinsight.utilities.DomainProcessor.DomainInfo
-import org.slf4j.Logger
+import org.apache.log4j.Logger
 
 
 /**
@@ -147,8 +147,7 @@ object DNSSuspiciousConnectsModel {
                     inDF: DataFrame,
                     topicCount: Int): DNSSuspiciousConnectsModel = {
 
-    logger.info("DNS pre LDA starts")
-    logger.info("Read source data")
+    logger.info("Training DNS suspicious connects model from " + config.dataSource)
 
     val selectedDF = inDF.select(modelColumns: _*)
 
@@ -206,7 +205,8 @@ object DNSSuspiciousConnectsModel {
       config.ldaPath,
       config.localUser,
       config.analysis,
-      config.nodes)
+      config.nodes,
+      config.ldaPRGSeed)
 
 
     new DNSSuspiciousConnectsModel(topicCount,

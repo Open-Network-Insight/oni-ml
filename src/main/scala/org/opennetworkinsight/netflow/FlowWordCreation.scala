@@ -1,5 +1,6 @@
 package org.opennetworkinsight.netflow
 
+import org.apache.log4j.Logger
 import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.functions._
@@ -7,7 +8,6 @@ import org.apache.spark.sql.types.{DoubleType, StringType, StructField, StructTy
 import org.apache.spark.sql.{DataFrame, Row, SQLContext}
 import org.opennetworkinsight.netflow.{FlowSchema => Schema}
 import org.opennetworkinsight.utilities.Quantiles
-import org.slf4j.Logger
 
 object FlowWordCreation {
 
@@ -46,6 +46,7 @@ object FlowWordCreation {
       .rdd
       .map({ case Row(ipkt: Long) => ipkt.toDouble }))
 
+
     logger.info(ipktCuts.mkString(","))
 
     var udfBin = this.udfBin(ibytCuts)
@@ -68,9 +69,9 @@ object FlowWordCreation {
             destinationIp = row.getString(fieldNamesIndex(Schema.DestinationIP)),
             destinationPort = row.getInt(fieldNamesIndex(Schema.DestinationPort)),
             sourcePort = row.getInt(fieldNamesIndex(Schema.SourcePort)),
-            ipktBin = row.getInt(fieldNamesIndex(Schema.IPKTBin)).toDouble,
-            ibytBin = row.getInt(fieldNamesIndex(Schema.IBYTBin)).toDouble,
-            timeBin = row.getInt(fieldNamesIndex(Schema.TimeBin)).toDouble)
+            ipktBin = row.getInt(fieldNamesIndex(Schema.IPKTBin)),
+            ibytBin = row.getInt(fieldNamesIndex(Schema.IBYTBin)),
+            timeBin = row.getInt(fieldNamesIndex(Schema.TimeBin)))
       })
 
     val schemaWithWord = {
@@ -95,11 +96,11 @@ object FlowWordCreation {
                  destinationIp: String,
                  destinationPort: Int,
                  sourcePort: Int,
-                 ipktBin: Double,
-                 ibytBin: Double,
-                 timeBin: Double) = {
-    var wordPort = 111111.0
-    var portCase = 0
+                 ipktBin: Int,
+                 ibytBin: Int,
+                 timeBin: Int) = {
+    var wordPort : Int= 111111
+    var portCase : Int = 0
 
     var ipPair = destinationIp + " " + sourceIp
     if (sourceIp < destinationIp && sourceIp != 0) {

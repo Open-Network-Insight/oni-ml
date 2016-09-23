@@ -2,7 +2,9 @@ package org.opennetworkinsight.utilities
 
 import org.apache.spark.broadcast.Broadcast
 
-
+/**
+  * Routines and data for processing URLs for domains, subdomains, country code, top-level domains, etc.
+  */
 object DomainProcessor extends Serializable {
 
   val CountryCodes = Set("ac", "ad", "ae", "af", "ag", "ai", "al", "am", "an", "ao", "aq", "ar", "as", "at", "au",
@@ -24,6 +26,16 @@ object DomainProcessor extends Serializable {
   val None = "None"
 
 
+  /**
+    * Commonly extracted domain features.
+    * @param domain Domain (if any) of a url.
+    * @param topDomain Numerical class of domain: 2 for Intel, 1 for Alexa top domains, 0 for others.
+    * @param subdomain Subdomain (if any) in the url.
+    * @param subdomainLength Length of the subdomain. 0 if there is none.
+    * @param subdomainEntropy Entropy of the subdomain viewed as a distribution on its character set.
+    *                         0 if there is no subdomain.
+    * @param numPeriods Number of periods + 1 in the url. (Number of sub-strings where url is split by periods.)
+    */
   case class DomainInfo(domain: String,
                         topDomain: Int,
                         subdomain: String,
@@ -32,6 +44,12 @@ object DomainProcessor extends Serializable {
                         numPeriods: Int)
 
 
+  /**
+    * Extract domain info from a url.
+    * @param url Incoming url.
+    * @param topDomainsBC Broadcast variable containing the top domains set.
+    * @return New [[DomainInfo]] object containing extracted domain information.
+    */
   def extractDomainInfo(url: String, topDomainsBC: Broadcast[Set[String]]): DomainInfo = {
 
     val spliturl = url.split('.')
@@ -60,11 +78,22 @@ object DomainProcessor extends Serializable {
   }
 
 
+  /**
+    *
+    * @param url Url from which to extract domain.
+    * @return Domain name or "None" if there is none.
+    */
   def extractDomain(url: String) : String = {
     val (domain, _) = extractDomainSubdomain(url)
     domain
   }
 
+  /**
+    * Extrat the domain and subdomain from a URL.
+    * @param url URL to be parsed.
+    * @return Pair of (domain, subdomain). If there is no domain, both fields contain "None".
+    *         If there is no subdomain then the subdomain field is "None"
+    */
   def extractDomainSubdomain(url: String) : (String, String) = {
     val spliturl = url.split('.')
     val numParts = spliturl.length
@@ -91,6 +120,11 @@ object DomainProcessor extends Serializable {
     (domain, subdomain)
     }
 
+  /**
+    * Strip the country code from a split URL.
+    * @param urlComponents Array of the entries of a URL after splitting on periods.
+    * @return URL components with the country code stripped.
+    */
   def removeCountryCode(urlComponents: Array[String]): Array[String] = {
     if (CountryCodes.contains(urlComponents.last)) {
       urlComponents.dropRight(1)
@@ -99,6 +133,11 @@ object DomainProcessor extends Serializable {
     }
   }
 
+  /**
+    * Strip the top-level domain name from a split URL.
+    * @param urlComponents Array of the entries ofa  URL after splitting on periods.
+    * @return URL components with the top-level domain name stripped.
+    */
   def removeTopLevelDomainName(urlComponents: Array[String]): Array[String] = {
     if (TopLevelDomainNames.contains(urlComponents.last)) {
       urlComponents.dropRight(1)

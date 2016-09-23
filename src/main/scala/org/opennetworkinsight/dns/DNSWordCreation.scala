@@ -1,5 +1,8 @@
 package org.opennetworkinsight.dns
 
+
+import org.apache.log4j.Logger
+import org.apache.spark.SparkContext
 import org.apache.spark.broadcast.Broadcast
 import org.apache.spark.sql.functions._
 import org.opennetworkinsight.utilities.Quantiles

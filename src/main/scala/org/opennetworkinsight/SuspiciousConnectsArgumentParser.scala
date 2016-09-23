@@ -25,7 +25,8 @@ object SuspiciousConnectsArgumentParser {
                                       hdfsScoredConnect: String = "",
                                       threshold: Double = 1.0d,
                                       maxResults: Int = -1,
-                                      outputDelimiter: String = "\t")
+                                      outputDelimiter: String = "\t",
+                                      ldaPRGSeed: Option[Long] = None)
 
   val parser: scopt.OptionParser[SuspiciousConnectsConfig] = new scopt.OptionParser[SuspiciousConnectsConfig]("LDA") {
 
@@ -107,5 +108,9 @@ object SuspiciousConnectsArgumentParser {
     opt[String]('b', "delimiter").optional().valueName("character").
       action((x, c) => c.copy(outputDelimiter = x)).
       text("number of most suspicious connections to return")
+
+    opt[String]("prgseed").optional().valueName("long").
+      action((x, c) => c.copy(ldaPRGSeed = Some(x.toLong))).
+      text("seed for the pseudorandom generator")
   }
 }

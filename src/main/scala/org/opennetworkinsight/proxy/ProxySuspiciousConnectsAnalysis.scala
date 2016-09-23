@@ -1,11 +1,11 @@
 package org.opennetworkinsight.proxy
 
+import org.apache.log4j.Logger
 import org.apache.spark.SparkContext
 import org.apache.spark.sql.SQLContext
 import org.opennetworkinsight.SuspiciousConnectsArgumentParser.SuspiciousConnectsConfig
 import org.opennetworkinsight.proxy.ProxySchema._
 import org.opennetworkinsight.utilities.DataFrameUtils
-import org.slf4j.Logger
 
 /**
   * Run suspicious connections analysis on proxy data.

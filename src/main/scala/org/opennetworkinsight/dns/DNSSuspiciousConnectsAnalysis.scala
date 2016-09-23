@@ -8,7 +8,7 @@ import org.opennetworkinsight.SuspiciousConnectsArgumentParser.SuspiciousConnect
 import org.opennetworkinsight.dns.DNSSchema._
 import org.opennetworkinsight.dns.model.DNSSuspiciousConnectsModel
 import org.opennetworkinsight.dns.sideinformation.DNSSideInformation
-import org.slf4j.Logger
+import org.apache.log4j.Logger
 
 import org.opennetworkinsight.dns.model.DNSSuspiciousConnectsModel.ModelSchema
 import org.opennetworkinsight.dns.sideinformation.DNSSideInformation.SideInfoSchema
