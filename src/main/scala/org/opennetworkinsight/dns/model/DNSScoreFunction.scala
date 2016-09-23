@@ -1,9 +1,23 @@
-package org.opennetworkinsight.dns
+package org.opennetworkinsight.dns.model
 
 import org.apache.spark.broadcast.Broadcast
 import org.opennetworkinsight.SuspiciousConnectsScoreFunction
+import org.opennetworkinsight.dns.DNSWordCreation
 
 
+/**
+  * Estimate the probabilities of network events using a [[DNSSuspiciousConnectsModel]]
+  *
+  * @param frameLengthCuts
+  * @param timeCuts
+  * @param subdomainLengthCuts
+  * @param entropyCuts
+  * @param numberPeriodsCuts
+  * @param topicCount
+  * @param ipToTopicMixBC
+  * @param wordToPerTopicProbBC
+  * @param topDomainsBC
+  */
 class DNSScoreFunction(frameLengthCuts: Array[Double],
                        timeCuts: Array[Double],
                        subdomainLengthCuts: Array[Double],
@@ -12,13 +26,13 @@ class DNSScoreFunction(frameLengthCuts: Array[Double],
                        topicCount: Int,
                        ipToTopicMixBC: Broadcast[Map[String, Array[Double]]],
                        wordToPerTopicProbBC: Broadcast[Map[String, Array[Double]]],
-                       countryCodesBC: Broadcast[Set[String]],
                        topDomainsBC: Broadcast[Set[String]]) extends Serializable {
 
 
   val suspiciousConnectsScoreFunction =
     new SuspiciousConnectsScoreFunction(topicCount, ipToTopicMixBC, wordToPerTopicProbBC)
 
+  val dnsWordCreator = new DNSWordCreation(frameLengthCuts, timeCuts, subdomainLengthCuts, entropyCuts, numberPeriodsCuts, topDomainsBC)
 
   def score(timeStamp: String,
             unixTimeStamp: Long,
@@ -27,24 +41,17 @@ class DNSScoreFunction(frameLengthCuts: Array[Double],
             queryName: String,
             queryClass: String,
             queryType: Int,
-            queryResponseCode: Int) : Double = {
+            queryResponseCode: Int): Double = {
 
-    val word = DNSWordCreation.dnsWord(timeStamp,
+    val word = dnsWordCreator.dnsWord(timeStamp,
       unixTimeStamp,
       frameLength,
       clientIP,
       queryName,
       queryClass,
       queryType,
-      queryResponseCode,
-      frameLengthCuts,
-      timeCuts,
-      subdomainLengthCuts,
-      entropyCuts,
-      numberPeriodsCuts,
-      countryCodesBC,
-      topDomainsBC)
+      queryResponseCode)
 
-    suspiciousConnectsScoreFunction.score(clientIP,word)
+    suspiciousConnectsScoreFunction.score(clientIP, word)
   }
 }

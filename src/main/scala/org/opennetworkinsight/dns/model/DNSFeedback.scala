@@ -1,18 +1,21 @@
-package org.opennetworkinsight.dns
+package org.opennetworkinsight.dns.model
 
 import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
-import org.apache.spark.sql.types._
 import org.apache.spark.sql.{DataFrame, Row, SQLContext}
-import org.opennetworkinsight.dns.DNSSchema._
+import org.opennetworkinsight.dns.model.DNSSuspiciousConnectsModel.{ModelSchema, modelColumns}
 
 import scala.io.Source
 
-import org.apache.spark.sql.functions._
+/**
+  * Routines for ingesting the feedback file provided by the operational analytics layer.
+  *
+  */
 object DNSFeedback {
 
   /**
     * Load the feedback file for DNS data.
+ *
     * @param sc Spark context.
     * @param sqlContext Spark SQL context.
     * @param feedbackFile Local machine path to the DNS feedback file.
@@ -25,21 +28,17 @@ object DNSFeedback {
                      duplicationFactor: Int): DataFrame = {
 
 
-
-
-    val feedbackSchema = StructType(
-      List(StructField(Timestamp, StringType, nullable= true),
-        StructField(UnixTimestamp, LongType, nullable= true),
-        StructField(FrameLength, IntegerType, nullable= true),
-        StructField(ClientIP, StringType, nullable= true),
-        StructField(QueryName, StringType, nullable= true),
-        StructField(QueryClass, StringType, nullable= true),
-        StructField(QueryType, IntegerType, nullable= true),
-        StructField(QueryResponseCode, IntegerType, nullable= true)))
-
     if (new java.io.File(feedbackFile).exists) {
 
-      /* dns_scores.csv - feedback file structure
+      /*
+      feedback file is a tab-separated file with a single header line.
+      */
+
+      val lines = Source.fromFile(feedbackFile).getLines().toArray.drop(1)
+      val feedback: RDD[String] = sc.parallelize(lines)
+
+      /*
+      The columns and their entries are thus:
 
       0   frame_time             object
       1   frame_len              object
@@ -77,12 +76,10 @@ object DNSFeedback {
       val DnsSevIndex = 18
       val fullURISeverityIndex = 22
 
-      val lines = Source.fromFile(feedbackFile).getLines().toArray.drop(1)
-      val feedback: RDD[String] = sc.parallelize(lines)
 
       sqlContext.createDataFrame(feedback.map(_.split("\t"))
         .filter(row => row(DnsSevIndex).trim.toInt == 3)
-        .map(row => Row.fromSeq(List(row(FrameTimeIndex),
+        .map(row => Row.fromSeq(Seq(row(FrameTimeIndex),
           row(UnixTimeStampIndex),
           row(FrameLenIndex),
           row(IpDstIndex),
@@ -90,10 +87,10 @@ object DNSFeedback {
           row(DnsQryClassIndex),
           row(DnsQryTypeIndex),
           row(DnsQryRcodeIndex))))
-        .flatMap(row => List.fill(duplicationFactor)(row)), feedbackSchema)
-        .select(ModelColumns:_*)
+        .flatMap(row => List.fill(duplicationFactor)(row)), ModelSchema)
+        .select(modelColumns:_*)
     } else {
-      sqlContext.createDataFrame(sc.emptyRDD[Row], feedbackSchema)
+      sqlContext.createDataFrame(sc.emptyRDD[Row], ModelSchema)
     }
   }
 }

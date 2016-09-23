@@ -1,9 +1,9 @@
-package org.opennetworkinsight.dns
+package org.opennetworkinsight.dns.sideinformation
 
 import org.apache.spark.broadcast.Broadcast
 import org.apache.spark.sql.Row
-import org.opennetworkinsight.dns.DNSWordCreation.SubdomainInfo
-import org.opennetworkinsight.utilities.Entropy
+import org.opennetworkinsight.dns.DNSWordCreation
+import org.opennetworkinsight.utilities.DomainProcessor.{DomainInfo, extractDomainInfo}
 
 
 class DNSSideInformationFunction(fieldNames: Array[String],
@@ -15,6 +15,8 @@ class DNSSideInformationFunction(fieldNames: Array[String],
                                  countryCodesBC: Broadcast[Set[String]],
                                  topDomainsBC: Broadcast[Set[String]]) extends Serializable {
 
+  val dnsWordCreator = new DNSWordCreation(frameLengthCuts, timeCuts, subdomainLengthCuts, entropyCuts, numberPeriodsCuts, topDomainsBC)
+
   def getSideFields(timeStamp: String,
                     unixTimeStamp: Long,
                     frameLength: Int,
@@ -24,27 +26,18 @@ class DNSSideInformationFunction(fieldNames: Array[String],
                     dnsQueryType: Int,
                     dnsQueryRcode: Int): SideFields = {
 
-    val SubdomainInfo(domain, subdomain, subdomainLength, numPeriods) =
-      DNSWordCreation.extractSubomain(countryCodesBC, queryName)
+    val DomainInfo(domain, topDomain, subdomain, subdomainLength, subdomainEntropy, numPeriods) =
+      extractDomainInfo(queryName, topDomainsBC)
 
-    val topDomain = DNSWordCreation.getTopDomain(topDomainsBC, domain)
-    val subdomainEntropy = if (subdomain != "None") Entropy.stringEntropy(subdomain) else 0d
 
-    val word = DNSWordCreation.dnsWord(timeStamp,
+    val word = dnsWordCreator.dnsWord(timeStamp,
       unixTimeStamp,
       frameLength,
       clientIP,
       queryName,
       queryClass,
       dnsQueryType,
-      dnsQueryRcode,
-      frameLengthCuts,
-      timeCuts,
-      subdomainLengthCuts,
-      entropyCuts,
-      numberPeriodsCuts,
-      countryCodesBC,
-      topDomainsBC)
+      dnsQueryRcode)
 
     SideFields(domain = domain,
       topDomain = topDomain,
@@ -56,14 +49,14 @@ class DNSSideInformationFunction(fieldNames: Array[String],
   }
 
 
-  def addSideFieldArray(timeStamp: String,
-                    unixTimeStamp: Long,
-                    frameLength: Int,
-                    clientIP: String,
-                    queryName: String,
-                    queryClass: String,
-                    dnsQueryType: Int,
-                    dnsQueryRcode: Int): Array[Any] = {
+  def addSideFieldSeq(timeStamp: String,
+                      unixTimeStamp: Long,
+                      frameLength: Int,
+                      clientIP: String,
+                      queryName: String,
+                      queryClass: String,
+                      dnsQueryType: Int,
+                      dnsQueryRcode: Int): Seq[Any] = {
 
     val sideFields = getSideFields(timeStamp,
       unixTimeStamp,
@@ -74,7 +67,20 @@ class DNSSideInformationFunction(fieldNames: Array[String],
       dnsQueryType,
       dnsQueryRcode)
 
-    Array(sideFields.domain, sideFields.topDomain, sideFields.subdomain, sideFields.subdomainLength, sideFields.subdomainEntropy, sideFields.numPeriods, sideFields.word)
+    // this is probably the bug
+    // the order does not match the frame schema
+    /*
+    object DNSSideInformation {
+  val sideFieldSchema = StructType(List(DomainField,
+    SubdomainField,
+    SubdomainLengthField,
+    SubdomainEntropyField,
+    TopDomainField,
+    NumPeriodsField,
+    WordField))
+}
+     */
+    Seq(sideFields.domain, sideFields.subdomain, sideFields.subdomainLength, sideFields.subdomainEntropy, sideFields.topDomain, sideFields.numPeriods, sideFields.word)
   }
 
 

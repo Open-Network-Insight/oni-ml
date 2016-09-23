@@ -1,60 +1,90 @@
 package org.opennetworkinsight.dns
 
 import org.apache.spark.SparkContext
-import org.apache.spark.sql.{DataFrame, Row, SQLContext}
-import org.opennetworkinsight.OniLDACWrapper.OniLDACOutput
-import org.opennetworkinsight.SuspiciousConnectsArgumentParser.SuspiciousConnectsConfig
-import org.slf4j.Logger
-import org.apache.spark.SparkContext
-import org.apache.spark.broadcast.Broadcast
-import org.apache.spark.rdd.RDD
-import org.apache.spark.sql.types.{DoubleType, StringType, StructField, StructType}
-import org.opennetworkinsight.OniLDACWrapper
-import org.opennetworkinsight.OniLDACWrapper.OniLDACOutput
+import org.apache.spark.sql.functions._
+import org.apache.spark.sql.types._
+import org.apache.spark.sql.{DataFrame, SQLContext}
 import org.opennetworkinsight.SuspiciousConnectsArgumentParser.SuspiciousConnectsConfig
 import org.opennetworkinsight.dns.DNSSchema._
-import org.opennetworkinsight.proxy.ProxySchema.{ClientIP => _, Score => _, _}
-import org.opennetworkinsight.utilities.{CountryCodes, DataFrameUtils}
+import org.opennetworkinsight.dns.model.DNSSuspiciousConnectsModel
+import org.opennetworkinsight.dns.sideinformation.DNSSideInformation
 import org.slf4j.Logger
 
+import org.opennetworkinsight.dns.model.DNSSuspiciousConnectsModel.ModelSchema
+import org.opennetworkinsight.dns.sideinformation.DNSSideInformation.SideInfoSchema
+
 /**
-  * Run suspicious connections analysis on DNS log data.
+  * The suspicious connections analysis of DNS log data develops a probabilistic model the DNS queries
+  * made by each client IP and flags
   */
 
 object DNSSuspiciousConnectsAnalysis {
 
+  val inSchema = StructType(List(TimestampField, UnixTimestampField, FrameLengthField, ClientIPField,
+      QueryNameField, QueryClassField, QueryTypeField, QueryResponseCodeField))
+
+  val inColumns = inSchema.fieldNames.map(col)
+
+
+  assert(ModelSchema.fields.forall(inSchema.fields.contains(_)))
+
+  val OutSchema = StructType(
+    List(TimestampField,
+      UnixTimestampField,
+      FrameLengthField,
+      ClientIPField,
+      QueryNameField,
+      QueryClassField,
+      QueryTypeField,
+      QueryResponseCodeField,
+      DomainField,
+      SubdomainField,
+      SubdomainLengthField,
+      NumPeriodsField,
+      SubdomainEntropyField,
+      TopDomainField,
+      WordField,
+      ScoreField))
+
+  val OutColumns = OutSchema.fieldNames.map(col)
+
+
+  /**
+    * Run suspicious connections analysis on DNS log data.
+    *
+    * @param config Object encapsulating runtime parameters and CLI options.
+    * @param sparkContext
+    * @param sqlContext
+    * @param logger
+    */
   def run(config: SuspiciousConnectsConfig, sparkContext: SparkContext, sqlContext: SQLContext, logger: Logger) = {
-    import sqlContext.implicits._
-
     logger.info("Starting DNS suspicious connects analysis.")
-
-    logger.info("Loading data")
-
 
     val topicCount = 20
 
+    logger.info("Loading data")
+
     val rawDataDF = sqlContext.read.parquet(config.inputPath)
       .filter(Timestamp + " is not null and " + UnixTimestamp + " is not null")
-      .select(ModelColumns:_*)
+      .select(inColumns:_*)
 
     logger.info("Training the model")
+
     val model =
       DNSSuspiciousConnectsModel.trainNewModel(sparkContext, sqlContext, logger, config, rawDataDF, topicCount)
 
     logger.info("Scoring")
     val scoredDF = model.score(sparkContext, sqlContext, rawDataDF)
 
-    // take the maxResults least probable events of probability below the threshold and sort
 
-    val filteredDF = scoredDF.filter(Score +  " <= " + config.threshold)
-    val topRows = DataFrameUtils.dfTakeOrdered(filteredDF, Score, config.maxResults)
-    val topRowsDF : DataFrame = sqlContext.createDataFrame(sparkContext.parallelize(topRows),filteredDF.schema)
+    val filteredDF = scoredDF.filter(Score + " <= " + config.threshold)
+    val mostSusipiciousDF: DataFrame = filteredDF.orderBy(Score).limit(config.maxResults)
 
-    // add the OA required columns  here
+    // add the "side information" expected by the OA layer
     val sideInformationGenerator = new DNSSideInformation(model)
-    val dfWithSideInfo = sideInformationGenerator.addSideInformationForOA(sparkContext, sqlContext, topRowsDF)
+    val dfWithSideInfo = sideInformationGenerator.addSideInformationForOA(sparkContext, sqlContext, mostSusipiciousDF)
 
-    val outputDF = dfWithSideInfo.sort(Score)
+    val outputDF = dfWithSideInfo.select(OutColumns:_*).sort(Score)
 
     logger.info("DNS  suspcicious connects analysis completed.")
     logger.info("Saving results to : " + config.hdfsScoredConnect)
