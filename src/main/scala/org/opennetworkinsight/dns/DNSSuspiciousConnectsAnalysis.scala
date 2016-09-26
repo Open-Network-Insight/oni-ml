@@ -60,7 +60,6 @@ object DNSSuspiciousConnectsAnalysis {
   def run(config: SuspiciousConnectsConfig, sparkContext: SparkContext, sqlContext: SQLContext, logger: Logger) = {
     logger.info("Starting DNS suspicious connects analysis.")
 
-    val topicCount = 20
 
     logger.info("Loading data")
 
@@ -71,7 +70,7 @@ object DNSSuspiciousConnectsAnalysis {
     logger.info("Training the model")
 
     val model =
-      DNSSuspiciousConnectsModel.trainNewModel(sparkContext, sqlContext, logger, config, rawDataDF, topicCount)
+      DNSSuspiciousConnectsModel.trainNewModel(sparkContext, sqlContext, logger, config, rawDataDF, config.topicCount)
 
     logger.info("Scoring")
     val scoredDF = model.score(sparkContext, sqlContext, rawDataDF)

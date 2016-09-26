@@ -127,7 +127,7 @@ object ProxySuspiciousConnectsModel {
       config.mpiPreparationCmd,
       config.mpiCmd,
       config.mpiProcessCount,
-      config.mpiTopicCount,
+      config.topicCount,
       config.localPath,
       config.ldaPath,
       config.localUser,

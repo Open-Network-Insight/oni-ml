@@ -29,7 +29,7 @@ object OniLDACWrapper {
              mpiPreparationCmd: String,
              mpiCmd: String,
              mpiProcessCount: String,
-             mpiTopicCount: String,
+             topicCount: Int,
              localPath: String,
              ldaPath: String,
              localUser: String,
@@ -84,7 +84,7 @@ object OniLDACWrapper {
     val prgSeedString = if (prgSeed.nonEmpty) prgSeed.get.toString() else ""
 
     sys.process.Process(Seq(mpiCmd, "-n", mpiProcessCount, "-f", "machinefile", "./lda", "est", "2.5",
-      mpiTopicCount, "settings.txt",  modelFile, "random", localPath, prgSeedString),
+      topicCount.toString(), "settings.txt",  modelFile, "random", localPath, prgSeedString),
       new java.io.File(ldaPath)) #> (System.out) !!
 
     // Read topic info per document
@@ -193,8 +193,8 @@ object OniLDACWrapper {
       })
     }
 
-    probabilityOfWordGivenTopic.zipWithIndex.map({ case (probOfWordGivenTopic, index) => (indexToWord(index) ->
-      probOfWordGivenTopic)}).toMap
+    probabilityOfWordGivenTopic.zipWithIndex.map({ case (probOfWordGivenTopic, index) => indexToWord(index) ->
+      probOfWordGivenTopic}).toMap
 
   }
 }

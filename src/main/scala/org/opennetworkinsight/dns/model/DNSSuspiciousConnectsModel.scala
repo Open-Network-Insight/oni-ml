@@ -147,7 +147,7 @@ object DNSSuspiciousConnectsModel {
                     inDF: DataFrame,
                     topicCount: Int): DNSSuspiciousConnectsModel = {
 
-    logger.info("Training DNS suspicious connects model from " + config.dataSource)
+    logger.info("Training DNS suspicious connects model from " + config.inputPath)
 
     val selectedDF = inDF.select(modelColumns: _*)
 
@@ -200,7 +200,7 @@ object DNSSuspiciousConnectsModel {
       config.mpiPreparationCmd,
       config.mpiCmd,
       config.mpiProcessCount,
-      config.mpiTopicCount,
+      config.topicCount,
       config.localPath,
       config.ldaPath,
       config.localUser,
