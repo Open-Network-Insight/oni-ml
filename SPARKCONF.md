@@ -30,7 +30,7 @@ effective way. Since not all clusters are the same and not all users are plannin
 variables that users need to configure before running oni-ml.
 
 After installing oni-setup users will find the [duxbay.conf](https://github.com/Open-Network-Insight/oni-setup/blob/master/duxbay.conf) 
-file under /etc folder. This file contains all the required configuration tu run oni-ml, as explained in [INSTALL.md](https://github.com/Open-Network-Insight/oni-ml/blob/master/INSTALL.md). In this
+file under /etc folder. This file contains all the required configuration to run oni-ml, as explained in [INSTALL.md](https://github.com/Open-Network-Insight/oni-ml/blob/master/INSTALL.md). In this
 file exist a section for _Spark_ properties, below is the explanation for each of those variables:
 
             SPK_EXEC=''                 ---> Maximumn number of executors
