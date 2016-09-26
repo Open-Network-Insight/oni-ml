@@ -3,18 +3,18 @@
 oni-ml main component uses Spark and Spark SQL to analyze network events and produce a list of least probable events
 or most suspicious. 
 
-Before running oni-ml users need to configure the component. Here are our recommended settings.  
+To run oni-ml with its best performance and scalability, it will probably be necessary to configure Yarn, Spark and Spot. Here are our recommended settings.  
 
-### Yarn tuning
+### General Yarn tuning
 
 oni-ml Spark application has been developed and tested on CDH [Yarn](http://spark.apache.org/docs/latest/running-on-yarn.html) 
 clusters. Careful tuning of the Yarn cluster may be necessary before analyzing large amounts of data with oni-ml.
 
-For small data sets, perhaps a couple of hundreds of gigabytes of CSV data, default _Yarn_ configurations should be enough
+For small data sets, under 100 GB parquet files, default _Yarn_ configurations should be enough
 but if users try to analyze hundreds of gigabytes of data in parquet format it's probable that it don't work; _Yarn_ most likely will start killing
  containers or will terminate the application with Out Of Memory errors.
 
-This document is not intended to explain in detail how to tune _Yarn_ but instead it provides some articles we used for this task:
+For more on how to tune Yarn for general use, we suggest these links:
 
 - [Cloudera Tuning Yarn](https://www.cloudera.com/documentation/enterprise/5-6-x/topics/cdh_ig_yarn_tuning.html)
 - [Tune Hadoop Cluster to get Maximum Performance](http://crazyadmins.com/tag/tuning-yarn-to-get-maximum-performance)
@@ -23,7 +23,7 @@ This document is not intended to explain in detail how to tune _Yarn_ but instea
 Users need to keep in mind that to get a Spark application running, especially for big data sets, it might take more than
 one try before getting any results.
 
-### Spark Properties
+### Configuring Spot's Usage of Spark
 
 When running _Spark_ on _Yarn_ users can set up a set of properties in order to get the best performance and consume resources in a more
 effective way. Since not all clusters are the same and not all users are planning to have the same capacity of computation, we have created
@@ -133,11 +133,11 @@ and 50 GB. Driver maximum results should be something equal or bigger than 8 GB.
 ####Out Of Memory Error
  
 This issue includes _java.lang.OutOfMemoryError: Java heap space_ and _java.lang.OutOfMemoryError : GC overhead limit exceeded_.
-When users get OOME can be for many different issues but we have identified a couple of important points or reasons for this
+When users get OOME can be for many different issues but we have identified a couple of reasons for this
 error in oni-ml. 
 
-The main reason for this error in oni-ml can be when oni-lda-c (ML part of oni-ml) returns many results for _word probabilities per topic_.
-These results are being broadcast so each executor needs more memory.
+The main reason for this error in oni-ml can be when the ML algorithm returns large results for _word probabilities per topic_.
+Since ML algorithm results are broadcast, each executor needs more memory.
 
 Another possible reason for this error is driver is running out of memory, try increasing driver memory.
 
