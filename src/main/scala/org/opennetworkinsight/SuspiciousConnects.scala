@@ -4,7 +4,7 @@ import org.apache.log4j.{Level, LogManager, Logger}
 import org.apache.spark.sql.SQLContext
 import org.apache.spark.{SparkConf, SparkContext}
 import org.opennetworkinsight.SuspiciousConnectsArgumentParser.SuspiciousConnectsConfig
-import org.opennetworkinsight.dns.DNSSuspiciousConnects
+import org.opennetworkinsight.dns.DNSSuspiciousConnectsAnalysis
 import org.opennetworkinsight.netflow.FlowSuspiciousConnects
 import org.opennetworkinsight.proxy.ProxySuspiciousConnectsAnalysis
 
@@ -46,7 +46,7 @@ object SuspiciousConnects {
 
         analysis match {
           case "flow" => FlowSuspiciousConnects.run(config, sparkContext, sqlContext, logger)
-          case "dns" => DNSSuspiciousConnects.run(config, sparkContext, sqlContext, logger)
+          case "dns" => DNSSuspiciousConnectsAnalysis.run(config, sparkContext, sqlContext, logger)
           case "proxy" => ProxySuspiciousConnectsAnalysis.run(config, sparkContext, sqlContext, logger)
           case _ => logger.error("Unsupported (or misspelled) analysis: " + analysis)
         }
