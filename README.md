@@ -1,19 +1,19 @@
-# oni-ml
+# spot-ml
 
 Machine learning routines for OpenNetworkInsight, version 1.1
 
-At present, oni-ml contains routines for performing *suspicious connections* analyses on netflow, DNS or proxy data gathered from a network. These
+At present, spot-ml contains routines for performing *suspicious connections* analyses on netflow, DNS or proxy data gathered from a network. These
 analyses consume a (possibly very lage) collection of network events and produces a list of the events that considered to be the least probable (or most suspicious).
 
-oni-ml is designed to be run as a component of Open-Network-Insight. It relies on the ingest component of Open-Network-Insight to collect and load
-netflow and DNS records, and oni-ml will try to load data to the operational analytics component of Open-Network-Insight.  It is strongly suggested that when experimenting with oni-ml, you do so as a part of the unified Open-Network-Insight system: Please see [the Open-Network-Insight wiki](https://github.com/Open-Network-Insight/open-network-insight/wiki)
+spot-ml is designed to be run as a component of Spot. It relies on the ingest component of Spot to collect and load
+netflow and DNS records, and spot-ml will try to load data to the operational analytics component of Spot.  It is suggested that when experimenting with spot-ml, you do so as a part of the unified Spot system: Please see [the Spot wiki]
 
-The remaining instructions in this README file treat oni-ml in a stand-alone fashion that might be helpful for customizing and troubleshooting the
+The remaining instructions in this README file treat spot-ml in a stand-alone fashion that might be helpful for customizing and troubleshooting the
 component.
 
 ## Prepare data for input 
 
-Load data for consumption by oni-ml by running [oni-ingest](https://github.com/Open-Network-Insight/oni-ingest/tree/dev).
+Load data for consumption by spot-ml by running [spot-ingest].
 
 The data format and location where the data is stored differs for netflow and DNS analyses.
 
@@ -21,7 +21,7 @@ The data format and location where the data is stored differs for netflow and DN
 
 Netflow data for the year YEAR, month  MONTH, and day DAY is stored in HDFS at `HUSER/flow/csv/y=YEAR/m=MONTH/d=DAY/*`
 
-Data for oni-ml netflow analyses is currently stored in text csv files using the following schema:
+Data for spot-ml netflow analyses is currently stored in text csv files using the following schema:
 
 - time: String
 - year: Double
@@ -55,7 +55,7 @@ Data for oni-ml netflow analyses is currently stored in text csv files using the
 
 DNS data for the year YEAR, month MONTH and day DAY is stored in Hive at `HUSER/dns/hive/y=YEAR/m=MONTH/d=DAY/`
 
-The Hive tables containing DNS data for oni-ml analyses have the following schema:
+The Hive tables containing DNS data for spot-ml analyses have the following schema:
 
 - frame_time: STRING
 - unix_tstamp: BIGINT
@@ -124,12 +124,12 @@ As the maximum probability of an event is 1, a threshold of 1 can be used to sel
 ```
 
 
-### oni-ml output
+### spot-ml output
 
 Final results are stored in the following file on HDFS.
 
 Depending on which data source is analyzed, 
-oni-ml output will be found under the ``HPATH`` at one of
+spot-ml output will be found under the ``HPATH`` at one of
 
      $HPATH/dns/scored_results/YYYYMMDD/scores/dns_results.csv
      $HPATH/proxy/scored_results/YYYYMMDD/scores/results.csv
@@ -138,7 +138,7 @@ oni-ml output will be found under the ``HPATH`` at one of
 
 It is a csv file in which network events annotated with estimated probabilities and sorted in ascending order.
 
-A successful run of oni-ml will also create and populate a directory at `LPATH/<source>/YYYYMMDD` where `<source>` is one of flow, dns or proxy, and
+A successful run of spot-ml will also create and populate a directory at `LPATH/<source>/YYYYMMDD` where `<source>` is one of flow, dns or proxy, and
 `YYYYMMDD` is the date argument provided to `ml_ops.sh` 
 This directory will contain the following files generated during the LDA procedure used for topic-modelling:
 
@@ -152,7 +152,7 @@ In addition, on each worker node identified in NODES, in the `LPATH/<source>/YYY
 
 ## Licensing
 
-oni-ml is licensed under Apache Version 2.0
+spot-ml is licensed under Apache Version 2.0
 
 ## Contributing
 
@@ -160,7 +160,7 @@ Create a pull request and contact the maintainers.
 
 ## Issues
 
-Report issues at the [OpenNetworkInsight issues page](https://github.com/Open-Network-Insight/open-network-insight/issues).
+Report issues at the [Spot issues page].
 
 ## Maintainers
 

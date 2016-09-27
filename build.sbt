@@ -1,4 +1,4 @@
-name := "oni-ml"
+name := "spot-ml"
 
 version := "1.1"
 
