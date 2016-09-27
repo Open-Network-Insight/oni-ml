@@ -108,7 +108,7 @@ object OniLDACWrapper {
     }
 
     // Create document results
-    val docToTopicMix = getDocumentResults(documentTopicMixRawLines, documentDictionary)
+    val docToTopicMix = getDocumentResults(documentTopicMixRawLines, documentDictionary, topicCount)
 
     // Create word results
     val wordResults = getWordToProbPerTopicMap(topicWordData, wordDictionary)
@@ -133,7 +133,7 @@ object OniLDACWrapper {
     wordProbs.map(_ / sumRawWord)
   }
 
-  def getTopicDocument(document: String, line: String) : (String, Array[Double])  = {
+  def getTopicDocument(document: String, line: String, topicCount: Int) : (String, Array[Double])  = {
     val topics = line.split(" ").map(_.toDouble)
     val topicsSum = topics.sum
 
@@ -142,7 +142,7 @@ object OniLDACWrapper {
       document -> topicsProb
     }
     else {
-      val topicsProb = Array.fill(20)(0d)
+      val topicsProb = Array.fill(topicCount)(0d)
       document ->  topicsProb
     }
   }
@@ -172,10 +172,11 @@ object OniLDACWrapper {
   }
 
   def getDocumentResults(topicDocumentData: Array[String],
-                         docIndexToDocument: Map[Int, String]) : Map[String, Array[Double]] = {
+                         docIndexToDocument: Map[Int, String],
+                         topicCount: Int) : Map[String, Array[Double]] = {
 
     topicDocumentData.zipWithIndex
-      .map({case (topic, docIdx) => getTopicDocument(docIndexToDocument(docIdx), topic)})
+      .map({case (topic, docIdx) => getTopicDocument(docIndexToDocument(docIdx), topic, topicCount)})
       .toMap
   }
 

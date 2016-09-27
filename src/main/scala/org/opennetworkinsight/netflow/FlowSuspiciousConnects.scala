@@ -21,7 +21,7 @@ object FlowSuspiciousConnects {
       config.ldaPath, config.localUser,  config.analysis, config.nodes, config.ldaPRGSeed)
 
     FlowPostLDA.flowPostLDA(config.inputPath, config.hdfsScoredConnect, config.outputDelimiter, config.threshold, config.maxResults, documentResults,
-      wordResults, sparkContext, sqlContext, logger)
+      wordResults, config.topicCount, sparkContext, sqlContext, logger)
 
     logger.info("Flow LDA completed")
   }

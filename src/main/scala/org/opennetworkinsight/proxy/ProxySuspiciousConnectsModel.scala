@@ -86,15 +86,13 @@ object ProxySuspiciousConnectsModel {
     * @param config       SuspiciousConnetsArgumnetParser.Config object containg CLI arguments.
     * @param inDF           Dataframe for training data, with columns Host, Time, ReqMethod, FullURI, ResponseContentType,
     *                     UserAgent, RespCode (as defined in ProxySchema object).
-    * @param topicCount   Number of topics used for topic modelling during training.
     * @return ProxySuspiciousConnectsModel
     */
   def trainNewModel(sparkContext: SparkContext,
                     sqlContext: SQLContext,
                     logger: Logger,
                     config: SuspiciousConnectsConfig,
-                    inDF: DataFrame,
-                    topicCount: Int): ProxySuspiciousConnectsModel = {
+                    inDF: DataFrame): ProxySuspiciousConnectsModel = {
 
     logger.info("training new proxy suspcious connects model")
 
@@ -135,7 +133,7 @@ object ProxySuspiciousConnectsModel {
       config.nodes,
       config.ldaPRGSeed)
 
-    new ProxySuspiciousConnectsModel(topicCount, documentResults, wordResults, timeCuts, entropyCuts, agentCuts)
+    new ProxySuspiciousConnectsModel(config.topicCount, documentResults, wordResults, timeCuts, entropyCuts, agentCuts)
   }
 
   /**
