@@ -1,6 +1,6 @@
 # spot-ml
 
-Machine learning routines for OpenNetworkInsight, version 1.1
+Machine learning routines for Apache Spot (incubating).
 
 ## Prerequisites, Installation and Configuration
 

@@ -1,6 +1,6 @@
 # spot-ml
 
-Machine learning routines for OpenNetworkInsight, version 1.1
+Machine learning routines for Apache Spot (incubating).
 
 At present, spot-ml contains routines for performing *suspicious connections* analyses on netflow, DNS or proxy data gathered from a network. These
 analyses consume a (possibly very lage) collection of network events and produces a list of the events that considered to be the least probable (or most suspicious).
