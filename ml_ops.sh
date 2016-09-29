@@ -23,7 +23,7 @@ fi
 # read in variables (except for date) from etc/.conf file
 # note: FDATE and DSOURCE *must* be defined prior sourcing this conf file
 
-source /etc/duxbay.conf
+source /etc/spot.conf
 
 # third argument if present will override default TOL from conf file
 
@@ -78,13 +78,13 @@ rm -f ${LPATH}/*.{dat,beta,gamma,other,pkl} # protect the flow_scores.csv file
 hdfs dfs -rm -R -f ${HDFS_SCORED_CONNECTS}
 
 # Add -p <command> to execute pre MPI command.
-# Pre MPI command can be configured in /etc/duxbay.conf
+# Pre MPI command can be configured in /etc/spot.conf
 # In this script, after the line after --mpicmd ${MPI_CMD} add:
 # --mpiprep ${MPI_PREP_CMD}
 
 ${MPI_PREP_CMD}
 
-time spark-submit --class "org.opennetworkinsight.SuspiciousConnects" \
+time spark-submit --class "org.apache.spot.SuspiciousConnects" \
   --master yarn-client \
   --driver-memory ${SPK_DRIVER_MEM} \
   --conf spark.driver.maxResultSize=${SPK_DRIVER_MAX_RESULTS} \
@@ -101,7 +101,7 @@ time spark-submit --class "org.opennetworkinsight.SuspiciousConnects" \
   --conf spark.shuffle.service.enabled=true \
   --conf spark.yarn.am.waitTime=1000000 \
   --conf spark.yarn.driver.memoryOverhead=${SPK_DRIVER_MEM_OVERHEAD} \
-  --conf spark.yarn.executor.memoryOverhead=${SPAK_EXEC_MEM_OVERHEAD} target/scala-2.10/oni-ml-assembly-1.1.jar \
+  --conf spark.yarn.executor.memoryOverhead=${SPAK_EXEC_MEM_OVERHEAD} target/scala-2.10/spot-ml-assembly-1.1.jar \
   --analysis ${DSOURCE} \
   --input ${RAWDATA_PATH}  \
   --dupfactor ${DUPFACTOR} \
