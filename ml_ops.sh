@@ -84,7 +84,7 @@ hdfs dfs -rm -R -f ${HDFS_SCORED_CONNECTS}
 
 ${MPI_PREP_CMD}
 
-time spark-submit --class "org.opennetworkinsight.SuspiciousConnects" \
+time spark-submit --class "org.spot.SuspiciousConnects" \
   --master yarn-client \
   --driver-memory ${SPK_DRIVER_MEM} \
   --conf spark.driver.maxResultSize=${SPK_DRIVER_MAX_RESULTS} \
