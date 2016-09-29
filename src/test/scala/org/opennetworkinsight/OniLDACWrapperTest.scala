@@ -24,13 +24,13 @@ class OniLDACWrapperTest extends TestingSparkContextFlatSpec with Matchers{
 
   "getTopicDocument" should "return string of document and 20 values when the sum of each value in the line is bigger" +
     "than 0. Each result value should be divided by the sum of all values" in {
-
+    val topicCount = 20
     val document = "192.168.1.1"
     val line = "0.0124531442 0.0124531442 0.0124531442 0.0124531442 0.0124531442 0.0124531442 0.0124531442 0.0124531442 " +
       "0.0124531442 0.0124531442 0.0124531442 23983.5532262138 0.0124531442 0.0124531442 0.0124531442 0.0124531442 " +
       "0.0124531442 0.0124531442 22999.4716800747 0.0124531442"
 
-    var (docOUT, topicMixOUT) = OniLDACWrapper.getTopicDocument(document, line)
+    var (docOUT, topicMixOUT) = OniLDACWrapper.getTopicDocument(document, line, topicCount)
 
     docOUT shouldBe document
     topicMixOUT shouldBe Array(2.6505498126219955E-7, 2.6505498126219955E-7, 2.6505498126219955E-7, 2.6505498126219955E-7,
@@ -43,8 +43,8 @@ class OniLDACWrapperTest extends TestingSparkContextFlatSpec with Matchers{
   it should "return string of document and 0.0 20 times when the sum of each value in the line is 0" in {
     val document = "192.168.1.1"
     val line = "0.0 0.0 1.0 -1.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0"
-
-    val (docOUT, topicMixOUT) = OniLDACWrapper.getTopicDocument(document, line)
+    val topicCount = 20
+    val (docOUT, topicMixOUT) = OniLDACWrapper.getTopicDocument(document, line, topicCount)
 
     docOUT shouldBe document
     topicMixOUT shouldBe Array(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
@@ -77,7 +77,7 @@ class OniLDACWrapperTest extends TestingSparkContextFlatSpec with Matchers{
   "getDocumentResults" should "return Array[String] of documents and its 20 values when the sum of each value in the line is bigger" +
     "than 0. Each result value should be divided by the sum of all values and the result array order should be the same" +
     "as incomming data (topicDocument Data)" in {
-
+    val topicCount = 20
     val documentDictionary = Map(3 -> "10.10.98.123", 0 -> "66.23.45.11", 1 -> "192.168.1.1", 2 -> "133.546.43.22")
     val topicDocumentData = Array("0.0124531442 0.0124531442 0.0124531442 0.0124531442 0.0124531442 0.0124531442 0.0124531442 " +
       "0.0124531442 0.0124531442 0.0124531442 0.0124531442 23983.5532262138 0.0124531442 0.0124531442 0.0124531442 " +
@@ -92,7 +92,7 @@ class OniLDACWrapperTest extends TestingSparkContextFlatSpec with Matchers{
       "0.0124531442 0.0124531442 0.0124531442 0.0124531442 0.0124531442 0.0124531442 0.0124531442 12.0124531442 " +
       "0.0124531442 0.0124531442 0.0124531442 0.0124531442")
 
-    val results = OniLDACWrapper.getDocumentResults(topicDocumentData, documentDictionary)
+    val results = OniLDACWrapper.getDocumentResults(topicDocumentData, documentDictionary, topicCount)
 
     results("66.23.45.11") shouldBe Array(2.6505498126219955E-7, 2.6505498126219955E-7, 2.6505498126219955E-7, 2.6505498126219955E-7,
       2.6505498126219955E-7, 2.6505498126219955E-7, 2.6505498126219955E-7, 2.6505498126219955E-7, 2.6505498126219955E-7,

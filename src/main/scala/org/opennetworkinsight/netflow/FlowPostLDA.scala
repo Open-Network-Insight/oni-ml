@@ -19,6 +19,7 @@ object FlowPostLDA {
                   threshold: Double, topK: Int,
                   docToTopicMix: Map[String, Array[Double]],
                   wordToProbPerTopic: Map[String, Array[Double]],
+                  topicCount: Int,
                   sc: SparkContext,
                   sqlContext: SQLContext,
                   logger: Logger) = {
@@ -71,8 +72,8 @@ object FlowPostLDA {
 
     val words = sc.broadcast(wordToProbPerTopic)
 
-    val dataWithSrcScore = score(sc, dataWithWord, docToTopicMixDF, words, SourceScore, SourceIP, SourceProbabilities, SourceWord)
-    val dataWithDestScore = score(sc, dataWithSrcScore, docToTopicMixDF, words, DestinationScore, DestinationIP, DestinationProbabilities, DestinationWord)
+    val dataWithSrcScore = score(sc, dataWithWord, docToTopicMixDF, words, SourceScore, SourceIP, SourceProbabilities, SourceWord, topicCount)
+    val dataWithDestScore = score(sc, dataWithSrcScore, docToTopicMixDF, words, DestinationScore, DestinationIP, DestinationProbabilities, DestinationWord, topicCount)
     val dataScored = minimumScore(dataWithDestScore)
 
     logger.info("Persisting data")
@@ -89,15 +90,16 @@ object FlowPostLDA {
             scoreColumnName: String,
             ipColumnName: String,
             ipProbabilitiesColumnName: String,
-            wordColumnName: String): DataFrame = {
+            wordColumnName: String,
+            topicCount: Int): DataFrame = {
 
     val dataWithIpProbJoin = dataFrame.join(docToTopicMixesDF, dataFrame(ipColumnName) === docToTopicMixesDF(Doc))
 
     var newSchemaColumns = dataFrame.schema.fieldNames :+ Probabilities + " as " + ipProbabilitiesColumnName
     val dataWithIpProb = dataWithIpProbJoin.selectExpr(newSchemaColumns: _*)
 
-    def scoreFunction(word: String, ipProbabilities: Seq[Double]): Double = {
-      val uniformProb = Array.fill(20)(0.05d)
+    def scoreFunction(word: String, ipProbabilities: Seq[Double], topicCount: Int): Double = {
+      val uniformProb = Array.fill(topicCount)(0.05d)
       val wordGivenTopicProb = wordToProbPerTopic.value.getOrElse(word, uniformProb)
 
       ipProbabilities.zip(wordGivenTopicProb)
@@ -105,7 +107,7 @@ object FlowPostLDA {
         .sum
     }
 
-    def udfScoreFunction = udf((word: String, ipProbabilities: Seq[Double]) => scoreFunction(word, ipProbabilities))
+    def udfScoreFunction = udf((word: String, ipProbabilities: Seq[Double]) => scoreFunction(word, ipProbabilities, topicCount))
 
     val result: DataFrame = dataWithIpProb.withColumn(scoreColumnName, udfScoreFunction(dataWithIpProb(wordColumnName), dataWithIpProb(ipProbabilitiesColumnName)))
     newSchemaColumns = dataFrame.schema.fieldNames :+ scoreColumnName

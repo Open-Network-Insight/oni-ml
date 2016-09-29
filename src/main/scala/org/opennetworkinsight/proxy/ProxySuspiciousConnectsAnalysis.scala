@@ -15,14 +15,12 @@ object ProxySuspiciousConnectsAnalysis {
   /**
     * Run suspicious connections analysis on proxy data.
     *
-    * @param config       SuspicionConnectsConfig objet, contains runtime parameters from CLI.
+    * @param config       SuspicionConnectsConfig object, contains runtime parameters from CLI.
     * @param sparkContext Apache Spark context.
     * @param sqlContext   Spark SQL context.
     * @param logger       Logs execution progress, information and errors for user.
     */
   def run(config: SuspiciousConnectsConfig, sparkContext: SparkContext, sqlContext: SQLContext, logger: Logger) = {
-
-    val topicCount = 20
 
     logger.info("Starting proxy suspicious connects analysis.")
 
@@ -35,7 +33,7 @@ object ProxySuspiciousConnectsAnalysis {
 
     logger.info("Training the model")
     val model =
-      ProxySuspiciousConnectsModel.trainNewModel(sparkContext, sqlContext, logger, config, rawDataDF, topicCount)
+      ProxySuspiciousConnectsModel.trainNewModel(sparkContext, sqlContext, logger, config, rawDataDF)
 
     logger.info("Scoring")
     val scoredDF = model.score(sparkContext, rawDataDF)
